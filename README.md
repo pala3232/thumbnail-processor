@@ -27,17 +27,19 @@ S3 (uploads/) ──event notification──→ SQS ──→ Worker (Fargate) �
 | `k8s/` | Kubernetes manifests (namespace, deployments, services, ingress) |
 | `bootstrap-terraform/` | One-time infra: GH Actions IAM role, ECR repos, tfstate bucket |
 | `terraform/` | Main infrastructure (EKS, VPC, IAM, SQS, S3, S3→SQS notification) |
+| `route53/` | DNS + TLS — Route53 hosted zone, ACM certificate, A record (applied last, after K8s) |
 | `scripts/` | Deploy scripts (KEDA, ALB controller, K8s manifests) |
 | `.github/workflows/` | CI/CD — build & push to ECR, deploy/destroy infrastructure |
 
 ## Services
 
 ### worker
-Polls SQS for messages. Each message body is an S3 key (`uploads/<filename>`).
+Polls SQS for S3 event notification messages. Parses the JSON body to extract the S3 key.
 1. Downloads video from S3
-2. Extracts 3 thumbnails at 0%, 50%, 100% of video duration via ffmpeg
+2. Extracts 3 thumbnails at 10%, 50%, 95% of video duration via ffmpeg
 3. Uploads thumbnails to S3 under `thumbnails/<stem>_1.jpg`, `_2.jpg`, `_3.jpg`
 4. Deletes the SQS message only after all uploads succeed (retries on failure via visibility timeout)
+5. Skips and deletes S3 test events (`s3:TestEvent`) sent when the notification is first created
 
 ### api
 FastAPI service — data source for the frontend.
@@ -59,7 +61,8 @@ Next.js dashboard. Connects to the API via WebSocket for real-time updates (reco
 - **Overview** — processed thumbnails, running pods, queue depth, in-flight, total pods, storage used
 - **Fargate Pods** — live pod grid with status, ready state, restart count, uptime
 - **Queue Activity** — SQS depth chart (30-min CloudWatch history)
-- **Thumbnail Gallery** — filterable by frame position (0%, 50%, 100%)
+- **Thumbnail Gallery** — filterable by frame position (10%, 50%, 95%)
+- **Test Pipeline button** — copies videos from the test source bucket into `uploads/` to trigger the pipeline
 
 ## Ingress Routing
 
@@ -110,6 +113,8 @@ The worker receives the S3 key as the message body and processes it with ffmpeg 
 ### api
 - `sqs:GetQueueAttributes`
 - `s3:ListBucket`, `s3:GetObject` on the thumbnails prefix
+- `s3:PutObject` on `uploads/` prefix (for Test Pipeline button)
+- `s3:ListBucket`, `s3:GetObject` on the test source bucket
 - `cloudwatch:GetMetricStatistics`
 - K8s RBAC: `get`, `list` on `pods` in the worker namespace
 
@@ -128,16 +133,31 @@ Or trigger the `bootstrap.yml` workflow from GitHub Actions.
 ### Every deploy
 
 ```
-2. terraform-apply.yml      # VPC, EKS, IAM, SQS, S3, S3→SQS notification
-3. build-push-a.yml         # build & push images to ECR (set image_tag e.g. 1.0.5)
-4. deploy-k8s.yml           # install KEDA + ALB controller + apply K8s manifests
+2. terraform-apply.yml          # VPC, EKS, IAM, SQS, S3, S3→SQS notification
+3. build-push-a.yml             # build & push images to ECR (set image_tag e.g. 1.0.5)
+4. deploy-k8s.yml               # install KEDA + ALB controller + apply K8s manifests
+```
+
+### HTTPS / custom domain (run after step 4, ALB must exist)
+
+```
+5. terraform-global.yml → action: apply, step: 1
+   # Creates Route53 hosted zone, ACM cert, DNS validation records
+   # Outputs the 4 NS records — paste them into Namecheap Custom DNS
+
+6. Wait for NS propagation (usually a few minutes)
+
+7. terraform-global.yml → action: apply, step: 2
+   # Waits for ACM cert validation, creates A record alias to ALB
+   # Annotates ingress with cert ARN → ALB enables HTTPS + HTTP→HTTPS redirect
 ```
 
 ### Tear down
 
 ```
-5. terraform-destroy.yml    # deletes K8s resources, waits for ALB, then terraform destroy
+8. terraform-destroy.yml    # deletes K8s resources, waits for ALB, then terraform destroy
    # ECR repos are NOT destroyed (managed by bootstrap)
+   # Note: destroy route53/ separately if needed (terraform destroy in route53/)
 ```
 
 ## CI/CD Workflows
@@ -148,6 +168,7 @@ Or trigger the `bootstrap.yml` workflow from GitHub Actions.
 | `terraform-apply.yml` | manual | Provision VPC, EKS, IAM, SQS, S3 |
 | `build-push-a.yml` | manual | Build & push Docker images to ECR |
 | `deploy-k8s.yml` | manual | Deploy KEDA, ALB controller, K8s manifests |
+| `terraform-global.yml` | manual | Route53 hosted zone + ACM cert + HTTPS ingress (step 1 → 2) |
 | `terraform-destroy.yml` | manual | Tear down all infrastructure |
 
 ### GitHub Secrets required
@@ -159,11 +180,12 @@ Or trigger the `bootstrap.yml` workflow from GitHub Actions.
 | `ECR_BASE_WORKER` | ECR repo URI for worker |
 | `ECR_BASE_API` | ECR repo URI for api |
 | `S3_BUCKET_NAME` | S3 bucket name for videos/thumbnails |
+| `DOMAIN_NAME` | Root domain (e.g. `ipalacio.com`) — used by `terraform-global.yml` |
 
 ## Kubernetes
 
 - **Ingress:** AWS Load Balancer Controller (ALB), `target-type: ip` required for Fargate
-- **Worker autoscaling:** KEDA `ScaledObject` — scales 0→10 based on SQS queue depth (target: 5 msgs/pod)
+- **Worker autoscaling:** KEDA `ScaledObject` — scales 0→10 based on SQS queue depth (1 pod per message, polling every 15s)
 - **Frontend/API autoscaling:** HPA — scales on CPU (70% threshold, min 1, max 3)
 - **Auth:** IRSA (IAM Roles for Service Accounts) — no static credentials in env vars
 - **CoreDNS:** Fargate-compatible — `eks.amazonaws.com/compute-type: ec2` annotation patched out on deploy

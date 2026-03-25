@@ -12,4 +12,5 @@ variable "subdomain" {
 variable "cluster_name" {
   description = "EKS cluster name for ALB lookup"
   type        = string
+  default     = "thumbnail-eks"
 }
