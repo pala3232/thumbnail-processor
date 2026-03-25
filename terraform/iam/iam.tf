@@ -80,6 +80,11 @@ module "api_iam_policy" {
         },
         {
           "Effect": "Allow",
+          "Action": ["s3:PutObject"],
+          "Resource": "arn:aws:s3:::${var.bucket_name}/uploads/*"
+        },
+        {
+          "Effect": "Allow",
           "Action": ["s3:ListBucket"],
           "Resource": "arn:aws:s3:::thumbnail-pipeline-test-source-pala3105"
         },
