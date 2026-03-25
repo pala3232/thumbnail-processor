@@ -3,8 +3,11 @@ set -e
 
 ALB_ROLE_ARN=$(cd ../terraform && terraform output -raw alb_controller_role_arn)
 CLUSTER_NAME=$(cd ../terraform && terraform output -raw cluster_name)
-echo "adding eks helm repo..."
+echo "removing existing ALB CRDs to let Helm manage them..."
+kubectl delete crd ingressclassparams.elbv2.k8s.aws --ignore-not-found
+kubectl delete crd targetgroupbindings.elbv2.k8s.aws --ignore-not-found
 
+echo "adding eks helm repo..."
 helm repo add eks https://aws.github.io/eks-charts
 helm repo update eks
 echo "done updating EKS! installing AWS Load Balancer Controller now..."
