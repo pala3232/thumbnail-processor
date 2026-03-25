@@ -1,4 +1,4 @@
-name: 01 | Deploy Infrastructure
+name: Deploy K8s
 
 on:
   workflow_dispatch:
