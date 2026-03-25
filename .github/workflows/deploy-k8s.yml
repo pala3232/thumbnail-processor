@@ -12,7 +12,7 @@ jobs:
   # DEPLOY CLUSTER
   # ════════════════════════════════════════════════════════════
 
-  deploy:
+  deploy-k8s:
     runs-on: ubuntu-latest
     permissions:
       id-token: write

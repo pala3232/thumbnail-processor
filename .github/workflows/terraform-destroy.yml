@@ -12,7 +12,7 @@ jobs:
   # DESTROY ALL
   # ════════════════════════════════════════════════════════════
 
-  network-primary:
+  destroy-all:
     runs-on: ubuntu-latest
     permissions:
       id-token: write

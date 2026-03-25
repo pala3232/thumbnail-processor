@@ -22,7 +22,7 @@ jobs:
   # APPLY ALL
   # ════════════════════════════════════════════════════════════
 
-  network-primary:
+  apply-all:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
