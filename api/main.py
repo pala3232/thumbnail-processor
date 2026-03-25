@@ -1,37 +1,34 @@
 """
-FastAPI service — exposes pipeline metrics to the frontend.
-Queries: SQS (queue depth), S3 (thumbnails), Kubernetes API (pods).
+FastAPI service — exposes pipeline data via HTTP and WebSocket.
+Queries: SQS (queue depth), S3 (thumbnails), Kubernetes API (pods), CloudWatch (history).
 
 Environment variables:
-  AWS_REGION        e.g. us-east-1
-  SQS_QUEUE_URL     full queue URL
-  S3_BUCKET         bucket name
-  S3_THUMBNAIL_PREFIX  prefix for thumbnails (default: thumbnails/)
+  AWS_REGION
+  SQS_QUEUE_URL
+  S3_BUCKET
+  S3_THUMBNAIL_PREFIX  (default: thumbnails/)
+  WORKER_NAMESPACE     (default: default)
 """
 
+import asyncio
+import logging
 import os
-import time
-from typing import Optional
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from typing import Any
 
 import boto3
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from kubernetes import client as k8s_client, config as k8s_config
 
-app = FastAPI(title="Thumbnail Pipeline API")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+log = logging.getLogger(__name__)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["GET"],
-    allow_headers=["*"],
-)
-
-# ── AWS clients (lazy, module-level) ──────────────────────────────────────────
+# ── AWS clients ────────────────────────────────────────────────────────────────
 
 _sqs = None
-_s3 = None
+_s3  = None
 
 def get_sqs():
     global _sqs
@@ -45,7 +42,7 @@ def get_s3():
         _s3 = boto3.client("s3", region_name=os.environ["AWS_REGION"])
     return _s3
 
-# ── Kubernetes client (in-cluster when deployed, local kubeconfig for dev) ────
+# ── Kubernetes client ──────────────────────────────────────────────────────────
 
 def get_k8s():
     try:
@@ -54,33 +51,86 @@ def get_k8s():
         k8s_config.load_kube_config()
     return k8s_client.CoreV1Api()
 
-# ── Routes ────────────────────────────────────────────────────────────────────
+# ── WebSocket connection manager ───────────────────────────────────────────────
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+class ConnectionManager:
+    def __init__(self):
+        self.active: set[WebSocket] = set()
 
+    async def connect(self, ws: WebSocket):
+        await ws.accept()
+        self.active.add(ws)
 
-@app.get("/api/queue")
-def queue():
-    """Current queue depth + 30-point history (sampled every ~10s via CloudWatch)."""
+    def disconnect(self, ws: WebSocket):
+        self.active.discard(ws)
+
+    async def broadcast(self, data: dict):
+        dead: set[WebSocket] = set()
+        for ws in self.active.copy():
+            try:
+                await ws.send_json(data)
+            except Exception:
+                dead.add(ws)
+        self.active -= dead
+
+manager = ConnectionManager()
+
+# ── Sync data helpers (run in thread pool via asyncio.to_thread) ───────────────
+
+def _fetch_metrics() -> dict:
     try:
-        sqs = get_sqs()
-        attrs = sqs.get_queue_attributes(
+        attrs = get_sqs().get_queue_attributes(
+            QueueUrl=os.environ["SQS_QUEUE_URL"],
+            AttributeNames=["ApproximateNumberOfMessages", "ApproximateNumberOfMessagesNotVisible"],
+        )["Attributes"]
+        queue_depth = int(attrs["ApproximateNumberOfMessages"])
+        in_flight   = int(attrs["ApproximateNumberOfMessagesNotVisible"])
+    except Exception:
+        queue_depth, in_flight = 0, 0
+
+    try:
+        bucket = os.environ["S3_BUCKET"]
+        prefix = os.environ.get("S3_THUMBNAIL_PREFIX", "thumbnails/")
+        resp   = get_s3().list_objects_v2(Bucket=bucket, Prefix=prefix)
+        total_thumbnails = resp.get("KeyCount", 0)
+        total_bytes      = sum(o["Size"] for o in resp.get("Contents", []))
+    except Exception:
+        total_thumbnails, total_bytes = 0, 0
+
+    try:
+        namespace = os.environ.get("WORKER_NAMESPACE", "default")
+        pod_list  = get_k8s().list_namespaced_pod(namespace=namespace)
+        running_pods = sum(1 for p in pod_list.items if p.status.phase == "Running")
+        total_pods   = len(pod_list.items)
+    except Exception:
+        running_pods, total_pods = 0, 0
+
+    return {
+        "queueDepth":      queue_depth,
+        "inFlight":        in_flight,
+        "totalThumbnails": total_thumbnails,
+        "storageBytes":    total_bytes,
+        "runningPods":     running_pods,
+        "totalPods":       total_pods,
+    }
+
+
+def _fetch_queue() -> dict:
+    try:
+        attrs = get_sqs().get_queue_attributes(
             QueueUrl=os.environ["SQS_QUEUE_URL"],
             AttributeNames=[
                 "ApproximateNumberOfMessages",
                 "ApproximateNumberOfMessagesNotVisible",
             ],
         )["Attributes"]
-        depth = int(attrs["ApproximateNumberOfMessages"])
+        depth     = int(attrs["ApproximateNumberOfMessages"])
         in_flight = int(attrs["ApproximateNumberOfMessagesNotVisible"])
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
 
-    # CloudWatch for history (last 5 minutes, 1-minute granularity)
     try:
-        cw = boto3.client("cloudwatch", region_name=os.environ["AWS_REGION"])
+        cw  = boto3.client("cloudwatch", region_name=os.environ["AWS_REGION"])
         now = datetime.now(timezone.utc)
         resp = cw.get_metric_statistics(
             Namespace="AWS/SQS",
@@ -101,13 +151,10 @@ def queue():
     return {"depth": depth, "inFlight": in_flight, "history": history}
 
 
-@app.get("/api/pods")
-def pods():
-    """List pods in the worker namespace."""
+def _fetch_pods() -> list:
     namespace = os.environ.get("WORKER_NAMESPACE", "default")
     try:
-        v1 = get_k8s()
-        pod_list = v1.list_namespaced_pod(namespace=namespace)
+        pod_list = get_k8s().list_namespaced_pod(namespace=namespace)
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
 
@@ -115,89 +162,130 @@ def pods():
     for p in pod_list.items:
         started = p.status.start_time.isoformat() if p.status.start_time else None
         result.append({
-            "name": p.metadata.name,
-            "status": p.status.phase,
-            "ready": all(cs.ready for cs in (p.status.container_statuses or [])),
-            "restarts": sum(cs.restart_count for cs in (p.status.container_statuses or [])),
+            "name":      p.metadata.name,
+            "status":    p.status.phase,
+            "ready":     all(cs.ready for cs in (p.status.container_statuses or [])),
+            "restarts":  sum(cs.restart_count for cs in (p.status.container_statuses or [])),
             "startedAt": started,
-            "node": p.spec.node_name,
+            "node":      p.spec.node_name,
         })
     return result
 
 
-@app.get("/api/thumbnails")
-def thumbnails():
-    """List thumbnails from S3."""
+def _fetch_thumbnails() -> list:
     bucket = os.environ["S3_BUCKET"]
     prefix = os.environ.get("S3_THUMBNAIL_PREFIX", "thumbnails/")
     try:
-        s3 = get_s3()
-        paginator = s3.get_paginator("list_objects_v2")
+        paginator = get_s3().get_paginator("list_objects_v2")
         items = []
         for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
             for obj in page.get("Contents", []):
                 key = obj["Key"]
                 if not key.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
                     continue
-                url = s3.generate_presigned_url(
+                url = get_s3().generate_presigned_url(
                     "get_object",
                     Params={"Bucket": bucket, "Key": key},
                     ExpiresIn=3600,
                 )
-                # Derive frame position from filename suffix (_1/_2/_3)
-                stem = key.rsplit(".", 1)[0]
-                suffix = stem[-1] if stem[-1].isdigit() else "1"
+                stem      = key.rsplit(".", 1)[0]
+                suffix    = stem[-1] if stem[-1].isdigit() else "1"
                 frame_map = {"1": "0%", "2": "50%", "3": "100%"}
                 items.append({
-                    "key": key,
-                    "url": url,
-                    "frame": frame_map.get(suffix, "0%"),
+                    "key":          key,
+                    "url":          url,
+                    "frame":        frame_map.get(suffix, "0%"),
                     "lastModified": obj["LastModified"].isoformat(),
-                    "size": obj["Size"],
+                    "size":         obj["Size"],
                 })
         return items
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
 
 
+async def collect_state() -> dict[str, Any]:
+    metrics, queue, pods, thumbnails = await asyncio.gather(
+        asyncio.to_thread(_fetch_metrics),
+        asyncio.to_thread(_fetch_queue),
+        asyncio.to_thread(_fetch_pods),
+        asyncio.to_thread(_fetch_thumbnails),
+        return_exceptions=True,
+    )
+    return {
+        "metrics":    metrics    if not isinstance(metrics,    Exception) else None,
+        "queue":      queue      if not isinstance(queue,      Exception) else None,
+        "pods":       pods       if not isinstance(pods,       Exception) else [],
+        "thumbnails": thumbnails if not isinstance(thumbnails, Exception) else [],
+    }
+
+
+async def broadcast_loop():
+    while True:
+        await asyncio.sleep(5)
+        if not manager.active:
+            continue
+        try:
+            state = await collect_state()
+            await manager.broadcast(state)
+        except Exception as e:
+            log.error(f"broadcast error: {e}")
+
+# ── App ────────────────────────────────────────────────────────────────────────
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(broadcast_loop())
+    yield
+    task.cancel()
+
+app = FastAPI(title="Thumbnail Pipeline API", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
+
+# ── HTTP routes ────────────────────────────────────────────────────────────────
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
 @app.get("/api/metrics")
 def metrics():
-    """High-level pipeline metrics."""
-    try:
-        sqs = get_sqs()
-        attrs = sqs.get_queue_attributes(
-            QueueUrl=os.environ["SQS_QUEUE_URL"],
-            AttributeNames=["ApproximateNumberOfMessages", "ApproximateNumberOfMessagesNotVisible"],
-        )["Attributes"]
-        queue_depth = int(attrs["ApproximateNumberOfMessages"])
-        in_flight = int(attrs["ApproximateNumberOfMessagesNotVisible"])
-    except Exception:
-        queue_depth, in_flight = 0, 0
+    return _fetch_metrics()
 
-    try:
-        s3 = get_s3()
-        bucket = os.environ["S3_BUCKET"]
-        prefix = os.environ.get("S3_THUMBNAIL_PREFIX", "thumbnails/")
-        resp = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-        total_thumbnails = resp.get("KeyCount", 0)
-        total_bytes = sum(o["Size"] for o in resp.get("Contents", []))
-    except Exception:
-        total_thumbnails, total_bytes = 0, 0
+@app.get("/api/queue")
+def queue():
+    return _fetch_queue()
 
-    try:
-        v1 = get_k8s()
-        namespace = os.environ.get("WORKER_NAMESPACE", "default")
-        pod_list = v1.list_namespaced_pod(namespace=namespace)
-        running_pods = sum(1 for p in pod_list.items if p.status.phase == "Running")
-        total_pods = len(pod_list.items)
-    except Exception:
-        running_pods, total_pods = 0, 0
+@app.get("/api/pods")
+def pods():
+    return _fetch_pods()
 
-    return {
-        "queueDepth": queue_depth,
-        "inFlight": in_flight,
-        "totalThumbnails": total_thumbnails,
-        "storageBytes": total_bytes,
-        "runningPods": running_pods,
-        "totalPods": total_pods,
-    }
+@app.get("/api/thumbnails")
+def thumbnails():
+    return _fetch_thumbnails()
+
+# ── WebSocket ──────────────────────────────────────────────────────────────────
+
+@app.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket):
+    await manager.connect(ws)
+    log.info(f"WS connected: {ws.client} — active: {len(manager.active)}")
+    try:
+        # Send current state immediately on connect
+        state = await collect_state()
+        await ws.send_json(state)
+        # Keep alive — client sends "ping" every 30s
+        while True:
+            await ws.receive_text()
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        log.error(f"WS error: {e}")
+    finally:
+        manager.disconnect(ws)
+        log.info(f"WS disconnected: {ws.client} — active: {len(manager.active)}")

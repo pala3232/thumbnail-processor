@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Activity, CheckCircle, Clock, Layers, BarChart2, Zap } from 'lucide-react'
-import type { PipelineMetrics } from '@/lib/types'
+import { CheckCircle, Layers, BarChart2, Activity, Database, Server } from 'lucide-react'
+import type { BackendMetrics } from '@/lib/useRealtimeData'
 
 function MetricCard({ icon: Icon, label, value, unit, color }: {
   icon: React.ElementType
@@ -30,39 +29,27 @@ function MetricCard({ icon: Icon, label, value, unit, color }: {
   )
 }
 
-export default function MetricsBar() {
-  const [metrics, setMetrics] = useState<PipelineMetrics | null>(null)
+function SkeletonCard() {
+  return <div className="flex-1 min-w-[140px] h-20 bg-panel border border-border rounded-xl animate-pulse" />
+}
 
-  useEffect(() => {
-    const fetch_ = async () => {
-      try {
-        const res = await fetch('/api/metrics')
-        setMetrics(await res.json())
-      } catch {
-        setMetrics({ totalProcessed: 0, successRate: 0, avgProcessingMs: 0, activePods: 0, queueDepth: 0, inFlight: 0, throughputPerHour: 0 })
-      }
-    }
-    fetch_()
-    const id = setInterval(fetch_, 5000)
-    return () => clearInterval(id)
-  }, [])
-
-  if (!metrics || metrics.totalProcessed === undefined) return (
-    <div className="flex gap-3 animate-pulse">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="flex-1 min-w-[140px] h-20 bg-panel border border-border rounded-xl" />
-      ))}
+export default function MetricsBar({ metrics }: { metrics: BackendMetrics | null }) {
+  if (!metrics) return (
+    <div className="flex gap-3">
+      {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
     </div>
   )
 
+  const storageMB = (metrics.storageBytes / 1024 / 1024).toFixed(1)
+
   return (
     <div className="flex flex-wrap gap-3">
-      <MetricCard icon={CheckCircle} label="Processed" value={metrics.totalProcessed.toLocaleString()} color="text-emerald-400" />
-      <MetricCard icon={Activity} label="Success Rate" value={metrics.successRate} unit="%" color="text-emerald-400" />
-      <MetricCard icon={Clock} label="Avg Time" value={(metrics.avgProcessingMs / 1000).toFixed(1)} unit="s" color="text-cyan-400" />
-      <MetricCard icon={Layers} label="Active Pods" value={metrics.activePods} color="text-indigo-400" />
-      <MetricCard icon={BarChart2} label="Queue Depth" value={metrics.queueDepth} color="text-amber-400" />
-      <MetricCard icon={Zap} label="Throughput" value={metrics.throughputPerHour} unit="/hr" color="text-violet-400" />
+      <MetricCard icon={CheckCircle} label="Processed"    value={metrics.totalThumbnails}          color="text-emerald-400" />
+      <MetricCard icon={Layers}      label="Running Pods" value={metrics.runningPods}               color="text-indigo-400" />
+      <MetricCard icon={Server}      label="Total Pods"   value={metrics.totalPods}                 color="text-indigo-300" />
+      <MetricCard icon={BarChart2}   label="Queue Depth"  value={metrics.queueDepth}                color="text-amber-400" />
+      <MetricCard icon={Activity}    label="In-Flight"    value={metrics.inFlight}                  color="text-cyan-400" />
+      <MetricCard icon={Database}    label="Storage"      value={storageMB} unit="MB"               color="text-violet-400" />
     </div>
   )
 }

@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Server, Clock } from 'lucide-react'
-import type { Pod, PodStatus } from '@/lib/types'
+import { Server, Clock, RefreshCw } from 'lucide-react'
+import type { BackendPod } from '@/lib/useRealtimeData'
 
 const STATUS_CONFIG: Record<string, { label: string; dot: string; text: string; bg: string }> = {
   Running:   { label: 'Running',   dot: 'bg-emerald-400 animate-pulse', text: 'text-emerald-400', bg: 'bg-emerald-400/10 border-emerald-400/20' },
@@ -20,12 +20,13 @@ function elapsed(iso: string) {
   return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`
 }
 
-function PodCard({ pod }: { pod: Pod }) {
+function PodCard({ pod }: { pod: BackendPod }) {
   const cfg = STATUS_CONFIG[pod.status] ?? FALLBACK_STATUS
-  const [age, setAge] = useState(() => elapsed(pod.startedAt))
+  const [age, setAge] = useState(() => pod.startedAt ? elapsed(pod.startedAt) : '—')
 
   useEffect(() => {
-    const id = setInterval(() => setAge(elapsed(pod.startedAt)), 1000)
+    if (!pod.startedAt) return
+    const id = setInterval(() => setAge(elapsed(pod.startedAt!)), 1000)
     return () => clearInterval(id)
   }, [pod.startedAt])
 
@@ -39,9 +40,9 @@ function PodCard({ pod }: { pod: Pod }) {
       className={`border rounded-xl p-4 flex flex-col gap-3 ${cfg.bg}`}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Server size={14} className={cfg.text} />
-          <span className="text-xs font-mono text-zinc-300 truncate max-w-[140px]">{pod.name}</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <Server size={14} className={`${cfg.text} shrink-0`} />
+          <span className="text-xs font-mono text-zinc-300 truncate" title={pod.name}>{pod.name}</span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <div className={`w-2 h-2 rounded-full ${cfg.dot}`} />
@@ -50,50 +51,36 @@ function PodCard({ pod }: { pod: Pod }) {
       </div>
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs font-mono">
-        <div className="text-zinc-500">Namespace</div>
-        <div className="text-zinc-300">{pod.namespace}</div>
-        <div className="text-zinc-500">CPU</div>
-        <div className="text-zinc-300">{pod.cpuRequest} vCPU</div>
-        <div className="text-zinc-500">Memory</div>
-        <div className="text-zinc-300">{pod.memRequest}</div>
-        <div className="text-zinc-500">Job</div>
-        <div className="text-zinc-300">{pod.jobId}</div>
+        <div className="text-zinc-500">Ready</div>
+        <div className={pod.ready ? 'text-emerald-400' : 'text-rose-400'}>{pod.ready ? 'Yes' : 'No'}</div>
+        <div className="text-zinc-500">Restarts</div>
+        <div className={`${pod.restarts > 0 ? 'text-amber-400' : 'text-zinc-300'}`}>{pod.restarts}</div>
       </div>
 
       <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-mono border-t border-white/5 pt-2">
         <Clock size={11} />
         <span>{age}</span>
-        <span className="ml-auto truncate text-right max-w-[120px]">{pod.node}</span>
+        <span className="ml-auto truncate text-right max-w-[140px]" title={pod.node ?? ''}>{pod.node ?? '—'}</span>
       </div>
     </motion.div>
   )
 }
 
-export default function PodGrid() {
-  const [pods, setPods] = useState<Pod[]>([])
-
-  useEffect(() => {
-    const fetch_ = async () => {
-      const res = await fetch('/api/pods')
-      setPods(await res.json())
-    }
-    fetch_()
-    const id = setInterval(fetch_, 8000)
-    return () => clearInterval(id)
-  }, [])
-
+export default function PodGrid({ pods }: { pods: BackendPod[] }) {
   const running = pods.filter(p => p.status === 'Running').length
-  const total = pods.length
 
   return (
     <section>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-widest font-mono">Fargate Pods</h2>
-        <span className="text-xs font-mono text-zinc-500">{running}/{total} running</span>
+        <div className="flex items-center gap-2 text-xs font-mono text-zinc-500">
+          <RefreshCw size={10} className="text-emerald-400" />
+          <span>{running}/{pods.length} running</span>
+        </div>
       </div>
       <AnimatePresence mode="popLayout">
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-          {pods.map(pod => <PodCard key={pod.id} pod={pod} />)}
+          {pods.map(pod => <PodCard key={pod.name} pod={pod} />)}
         </div>
       </AnimatePresence>
     </section>

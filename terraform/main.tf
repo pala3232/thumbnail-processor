@@ -47,3 +47,36 @@ module "s3" {
 module "sqs" {
   source = "./sqs"
 }
+
+# S3 -> SQS event notification
+
+resource "aws_s3_bucket_notification" "upload_notification" {
+  bucket = module.s3.s3_bucket_id
+
+  queue {
+    queue_arn     = module.sqs.queue_arn
+    events        = ["s3:ObjectCreated:*"]
+    filter_prefix = "uploads/"
+    filter_suffix = ".mp4"
+  }
+}
+
+resource "aws_sqs_queue_policy" "allow_s3" {
+  queue_url = module.sqs.queue_url
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "AllowS3SendMessage"
+      Effect    = "Allow"
+      Principal = { Service = "s3.amazonaws.com" }
+      Action    = "sqs:SendMessage"
+      Resource  = module.sqs.queue_arn
+      Condition = {
+        ArnLike = {
+          "aws:SourceArn" = module.s3.s3_bucket_arn
+        }
+      }
+    }]
+  })
+}

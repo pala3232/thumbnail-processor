@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { ImageIcon, Clock } from 'lucide-react'
-import type { Thumbnail } from '@/lib/types'
+import { ImageIcon } from 'lucide-react'
+import type { BackendThumbnail } from '@/lib/useRealtimeData'
 
 const FRAME_COLOR: Record<string, string> = {
   '0%':   'text-cyan-400 border-cyan-400/30 bg-cyan-400/10',
@@ -11,8 +11,9 @@ const FRAME_COLOR: Record<string, string> = {
   '100%': 'text-emerald-400 border-emerald-400/30 bg-emerald-400/10',
 }
 
-function ThumbnailCard({ thumb, index }: { thumb: Thumbnail; index: number }) {
-  const frameStyle = FRAME_COLOR[thumb.frame]
+function ThumbnailCard({ thumb, index }: { thumb: BackendThumbnail; index: number }) {
+  const frameStyle = FRAME_COLOR[thumb.frame] ?? FRAME_COLOR['0%']
+  const videoKey   = thumb.key.replace(/^thumbnails\//, '').replace(/_[123]\.\w+$/, '.mp4')
 
   return (
     <motion.div
@@ -25,7 +26,7 @@ function ThumbnailCard({ thumb, index }: { thumb: Thumbnail; index: number }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={thumb.url}
-          alt={`Thumbnail ${thumb.frame} of ${thumb.videoKey}`}
+          alt={`Thumbnail ${thumb.frame} of ${videoKey}`}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           loading="lazy"
         />
@@ -35,26 +36,18 @@ function ThumbnailCard({ thumb, index }: { thumb: Thumbnail; index: number }) {
       </div>
 
       <div className="p-3 flex flex-col gap-1.5">
-        <p className="text-xs font-mono text-zinc-300 truncate">{thumb.videoKey.replace('uploads/', '')}</p>
+        <p className="text-xs font-mono text-zinc-300 truncate">{videoKey}</p>
         <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500">
-          <span className="flex items-center gap-1">
-            <Clock size={9} />
-            {(thumb.processingTimeMs / 1000).toFixed(1)}s
-          </span>
-          <span>{thumb.jobId}</span>
+          <span>{(thumb.size / 1024).toFixed(0)} KB</span>
+          <span className="truncate ml-2 text-right">{new Date(thumb.lastModified).toLocaleTimeString()}</span>
         </div>
       </div>
     </motion.div>
   )
 }
 
-export default function ThumbnailGallery() {
-  const [thumbs, setThumbs] = useState<Thumbnail[]>([])
+export default function ThumbnailGallery({ thumbs }: { thumbs: BackendThumbnail[] }) {
   const [filter, setFilter] = useState<string>('all')
-
-  useEffect(() => {
-    fetch('/api/thumbnails').then(r => r.json()).then(setThumbs).catch(() => {})
-  }, [])
 
   const filtered = filter === 'all' ? thumbs : thumbs.filter(t => t.frame === filter)
 
@@ -89,7 +82,7 @@ export default function ThumbnailGallery() {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
-          {filtered.map((t, i) => <ThumbnailCard key={t.id} thumb={t} index={i} />)}
+          {filtered.map((t, i) => <ThumbnailCard key={t.key} thumb={t} index={i} />)}
         </div>
       )}
     </section>
