@@ -2,7 +2,7 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 20.0"
 
-  cluster_name    = "thumbnail-pipeline-eks-cluster"
+  cluster_name    = "thumbnail-eks"
   cluster_version = "1.33"
 
   cluster_endpoint_public_access  = true

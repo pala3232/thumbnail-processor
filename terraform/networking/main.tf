@@ -62,14 +62,14 @@ module "endpoints" {
       private_dns_enabled = true
     },
     ecr_api = {
-      service             = "ecr-api"
+      service             = "ecr.api"
       private_dns_enabled = true
       security_group_ids  = [module.vpc.default_security_group_id]
       subnet_ids          = module.vpc.private_subnets
       tags                = { Name = "ecr-api-vpc-endpoint" }
     },
     ecr_dkr = {
-      service             = "ecr-dkr"
+      service             = "ecr.dkr"
       private_dns_enabled = true
       security_group_ids  = [module.vpc.default_security_group_id]
       subnet_ids          = module.vpc.private_subnets
