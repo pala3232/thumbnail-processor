@@ -42,6 +42,13 @@ jobs:
         run: |
           aws eks update-kubeconfig --name thumbnail-eks --region ap-southeast-2
 
+      - name: Patch CoreDNS for Fargate
+        run: |
+          kubectl patch deployment coredns -n kube-system --type json \
+            -p='[{"op":"remove","path":"/spec/template/metadata/annotations/eks.amazonaws.com~1compute-type"}]' \
+            2>/dev/null || true
+          kubectl rollout status deployment/coredns -n kube-system --timeout=120s
+
       - name: Install KEDA
         run: |
           cd scripts
