@@ -47,7 +47,3 @@ module "s3" {
 module "sqs" {
   source = "./sqs"
 }
-
-module "ecr" {
-  source = "./ecr"
-}

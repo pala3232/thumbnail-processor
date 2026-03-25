@@ -22,9 +22,10 @@ SQS → Worker (Fargate Job) → S3 (download video, upload thumbnails)
 | `api/` | FastAPI service — exposes SQS/S3/K8s metrics to the frontend |
 | `worker/` | Python worker — polls SQS, generates thumbnails via ffmpeg, uploads to S3 |
 | `k8s/` | Kubernetes manifests (namespace, deployments, services, ingress) |
-| `terraform/` | Infrastructure (EKS, SQS, S3, ECR, IAM) |
+| `bootstrap-terraform/` | One-time infra: GH Actions IAM role, ECR repos, tfstate bucket config |
+| `terraform/` | Main infrastructure (EKS, VPC, IAM, SQS, S3) — destroy/recreate freely |
 | `scripts/` | Deploy scripts (KEDA, ALB controller, K8s manifests) |
-| `.github/workflows/` | CI/CD — build & push to ECR, deploy infrastructure |
+| `.github/workflows/` | CI/CD — build & push to ECR, deploy/destroy infrastructure |
 
 ## Services
 
@@ -85,32 +86,52 @@ Next.js dashboard with:
 - `cloudwatch:GetMetricStatistics`
 - K8s RBAC: `get`, `list` on `pods` in the worker namespace
 
-## Deploy order
+## Deploy Order
+
+### First time only — bootstrap (run once)
 
 ```
-1. terraform apply              # VPC, EKS, IAM, S3, SQS, ECR
-2. scripts/deploy-keda.sh       # install KEDA into kube-system
-3. scripts/deploy-aws-lb.sh     # install AWS Load Balancer Controller
-4. build-push-a.yml             # build & push images to ECR
-5. scripts/deploy-k8s.sh        # apply all K8s manifests
+1. cd bootstrap-terraform && terraform init && terraform apply
+   # Creates: GH Actions IAM role, ECR repos, tfstate bucket settings
+   # State: s3://tfstate-pala3105/thumbnail/bootstrap.tfstate
 ```
 
-Or run steps 2–5 via the `deploy-k8s.yml` workflow (`01 | Deploy Infrastructure`).
+Or trigger the `bootstrap.yml` workflow from GitHub Actions.
 
-## CI/CD
+### Every deploy
 
-### Build & push — `.github/workflows/build-push-a.yml`
+```
+2. terraform-apply.yml      # VPC, EKS, IAM, SQS, S3
+3. build-push-a.yml         # build & push images to ECR (set image_tag e.g. 1.0.0)
+4. deploy-k8s.yml           # install KEDA + ALB controller + apply K8s manifests
+```
 
-Trigger: `workflow_dispatch` with inputs:
-- `service`: `frontend`, `worker`, `api` — leave blank to build all
-- `image_tag`: semver tag (e.g. `1.3.0`)
-- `environment`: `dev`, `staging`, `prod` (default: `dev`)
+### Tear down
 
-Secrets required in GitHub:
-- `AWS_ROLE_ARN` — OIDC role for GitHub Actions
-- `ECR_BASE_FRONTEND` — ECR repo URI for frontend
-- `ECR_BASE_WORKER` — ECR repo URI for worker
-- `ECR_BASE_API` — ECR repo URI for api
+```
+5. terraform-destroy.yml    # deletes K8s resources, waits for ALB, then terraform destroy
+   # ECR repos are NOT destroyed (managed by bootstrap)
+```
+
+## CI/CD Workflows
+
+| Workflow | Trigger | Description |
+|---|---|---|
+| `bootstrap.yml` | manual | One-time: GH Actions role, ECR repos |
+| `terraform-apply.yml` | manual | Provision VPC, EKS, IAM, SQS, S3 |
+| `build-push-a.yml` | manual | Build & push Docker images to ECR |
+| `deploy-k8s.yml` | manual | Deploy KEDA, ALB controller, K8s manifests |
+| `terraform-destroy.yml` | manual | Tear down all infrastructure |
+
+### GitHub Secrets required
+
+| Secret | Description |
+|---|---|
+| `AWS_ROLE_ARN` | OIDC role ARN for GitHub Actions |
+| `ECR_BASE_FRONTEND` | ECR repo URI for frontend |
+| `ECR_BASE_WORKER` | ECR repo URI for worker |
+| `ECR_BASE_API` | ECR repo URI for api |
+| `S3_BUCKET_NAME` | S3 bucket name for videos/thumbnails |
 
 ## Kubernetes
 

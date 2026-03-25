@@ -1,0 +1,30 @@
+name: Bootstrap
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ap-southeast-2
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: |
+          cd bootstrap-terraform
+          terraform init
+
+      - name: Terraform Apply
+        run: |
+          cd bootstrap-terraform
+          terraform apply -auto-approve

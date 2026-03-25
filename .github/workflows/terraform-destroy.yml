@@ -27,13 +27,13 @@ jobs:
       - uses: azure/setup-kubectl@v4
 
       - name: Configure kubectl
-        run: aws eks update-kubeconfig --name thumbnail-eks --region ap-southeast-2
+        run: aws eks update-kubeconfig --name thumbnail-eks --region ap-southeast-2 || true
 
       - name: Delete K8s resources
         run: |
-          kubectl delete ingress --all -n thumbnail --ignore-not-found
-          kubectl delete deployment --all -n thumbnail --ignore-not-found
-          kubectl delete service --all -n thumbnail --ignore-not-found
+          kubectl delete ingress --all -n thumbnail --ignore-not-found 2>/dev/null || true
+          kubectl delete deployment --all -n thumbnail --ignore-not-found 2>/dev/null || true
+          kubectl delete service --all -n thumbnail --ignore-not-found 2>/dev/null || true
           echo "Waiting 60s for ALB to be deprovisioned..."
           sleep 60
 
@@ -41,4 +41,7 @@ jobs:
         run: |
           cd terraform
           terraform init -reconfigure
+          terraform state rm 'module.ecr.aws_ecr_repository.worker' 2>/dev/null || true
+          terraform state rm 'module.ecr.aws_ecr_repository.frontend' 2>/dev/null || true
+          terraform state rm 'module.ecr.aws_ecr_repository.api' 2>/dev/null || true
           terraform destroy -auto-approve
