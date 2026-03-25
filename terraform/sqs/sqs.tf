@@ -1,5 +1,6 @@
 module "sqs" {
-  source = "terraform-aws-modules/sqs/aws"
+  source  = "terraform-aws-modules/sqs/aws"
+  version = "~> 4.0"
 
   name                       = "thumbnail-pipeline-queue"
   visibility_timeout_seconds = 300
