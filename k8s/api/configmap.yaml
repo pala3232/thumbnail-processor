@@ -8,3 +8,4 @@ data:
   AWS_REGION: ap-southeast-2
   S3_BUCKET: thumbnail-pipeline-pala3105
   WORKER_NAMESPACE: thumbnail
+  TEST_SOURCE_BUCKET: thumbnail-pipeline-test-source-pala3105

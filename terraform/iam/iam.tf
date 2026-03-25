@@ -80,6 +80,16 @@ module "api_iam_policy" {
         },
         {
           "Effect": "Allow",
+          "Action": ["s3:ListBucket"],
+          "Resource": "arn:aws:s3:::thumbnail-pipeline-test-source-pala3105"
+        },
+        {
+          "Effect": "Allow",
+          "Action": ["s3:GetObject"],
+          "Resource": "arn:aws:s3:::thumbnail-pipeline-test-source-pala3105/*"
+        },
+        {
+          "Effect": "Allow",
           "Action": ["cloudwatch:GetMetricStatistics"],
           "Resource": "*"
         },

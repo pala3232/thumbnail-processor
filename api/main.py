@@ -269,6 +269,43 @@ def pods():
 def thumbnails():
     return _fetch_thumbnails()
 
+@app.post("/api/test")
+def trigger_test():
+    """Copy videos from TEST_SOURCE_BUCKET into uploads/ to trigger the pipeline."""
+    source_bucket = os.environ.get("TEST_SOURCE_BUCKET")
+    if not source_bucket:
+        raise HTTPException(status_code=400, detail="TEST_SOURCE_BUCKET not configured")
+
+    VIDEO_EXTENSIONS = ('.mp4', '.mov', '.mkv', '.avi', '.webm', '.wmv', '.flv', '.m4v', '.ts', '.3gp')
+    dest_bucket = os.environ["S3_BUCKET"]
+    s3 = get_s3()
+
+    try:
+        resp = s3.list_objects_v2(Bucket=source_bucket)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Could not list source bucket: {e}")
+
+    copied = 0
+    skipped = 0
+    for obj in resp.get("Contents", []):
+        key = obj["Key"]
+        if not key.lower().endswith(VIDEO_EXTENSIONS):
+            skipped += 1
+            continue
+        dest_key = f"uploads/{key.split('/')[-1]}"
+        try:
+            s3.copy_object(
+                CopySource={"Bucket": source_bucket, "Key": key},
+                Bucket=dest_bucket,
+                Key=dest_key,
+            )
+            copied += 1
+            log.info(f"test: copied s3://{source_bucket}/{key} → s3://{dest_bucket}/{dest_key}")
+        except Exception as e:
+            log.error(f"test: failed to copy {key}: {e}")
+
+    return {"queued": copied, "skipped": skipped}
+
 # ── WebSocket ──────────────────────────────────────────────────────────────────
 
 @app.websocket("/ws")

@@ -2,7 +2,8 @@
 
 import dynamic from 'next/dynamic'
 import { motion } from 'framer-motion'
-import { Github, Layers, ChevronDown } from 'lucide-react'
+import { Github, Layers, ChevronDown, FlaskConical } from 'lucide-react'
+import { useState } from 'react'
 import { useRealtimeData } from '@/lib/useRealtimeData'
 import MetricsBar from '@/components/dashboard/MetricsBar'
 import PodGrid from '@/components/dashboard/PodGrid'
@@ -47,6 +48,55 @@ const PipelineScene = dynamic(() => import('@/components/scene/PipelineScene'), 
   ssr: false,
   loading: () => <div className="w-full h-full bg-surface" />,
 })
+
+// ── Test button ────────────────────────────────────────────────────────────────
+
+type TestState = 'idle' | 'loading' | 'success' | 'error'
+
+function TestButton() {
+  const [state, setState] = useState<TestState>('idle')
+  const [result, setResult] = useState<string>('')
+
+  const run = async () => {
+    setState('loading')
+    try {
+      const res = await fetch('/api/test', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        setResult(data.detail ?? data.error ?? 'Error')
+        setState('error')
+      } else {
+        setResult(`${data.queued} video${data.queued !== 1 ? 's' : ''} queued`)
+        setState('success')
+      }
+    } catch {
+      setResult('Could not reach API')
+      setState('error')
+    }
+    setTimeout(() => setState('idle'), 4000)
+  }
+
+  const styles: Record<TestState, string> = {
+    idle:    'border-zinc-700 text-zinc-400 hover:border-indigo-500/60 hover:text-indigo-400',
+    loading: 'border-zinc-700 text-zinc-500 cursor-not-allowed',
+    success: 'border-emerald-500/40 text-emerald-400',
+    error:   'border-rose-500/40 text-rose-400',
+  }
+
+  return (
+    <button
+      onClick={run}
+      disabled={state === 'loading'}
+      className={`flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-lg border transition-colors ${styles[state]}`}
+    >
+      <FlaskConical size={12} />
+      {state === 'idle'    && 'Test Pipeline'}
+      {state === 'loading' && 'Queueing...'}
+      {state === 'success' && result}
+      {state === 'error'   && result}
+    </button>
+  )
+}
 
 // ── Live badge ─────────────────────────────────────────────────────────────────
 
@@ -170,7 +220,10 @@ export default function Home() {
       <div className="pt-10">
         <main className="max-w-screen-2xl mx-auto px-4 sm:px-6 pb-20 flex flex-col gap-10">
           <section>
-            <h2 className="text-xs font-mono text-zinc-500 uppercase tracking-widest mb-4">Overview</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xs font-mono text-zinc-500 uppercase tracking-widest">Overview</h2>
+              <TestButton />
+            </div>
             <MetricsBar metrics={metrics} />
           </section>
 
