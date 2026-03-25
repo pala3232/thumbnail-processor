@@ -3,6 +3,7 @@ set -e
 
 ALB_ROLE_ARN=$(cd ../terraform && terraform output -raw alb_controller_role_arn)
 CLUSTER_NAME=$(cd ../terraform && terraform output -raw cluster_name)
+VPC_ID=$(cd ../terraform && terraform output -raw vpc_id)
 echo "removing existing ALB helm release and CRDs for clean install..."
 helm uninstall aws-load-balancer-controller -n kube-system --no-hooks 2>/dev/null || true
 kubectl delete secret -n kube-system -l name=aws-load-balancer-controller,owner=helm --ignore-not-found
@@ -17,6 +18,7 @@ echo "done updating EKS! installing AWS Load Balancer Controller now..."
 helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
   -n kube-system \
   --set clusterName=$CLUSTER_NAME \
+  --set vpcId=$VPC_ID \
   --set serviceAccount.create=true \
   --set serviceAccount.name=aws-load-balancer-controller \
   --set "serviceAccount.annotations.eks\.amazonaws\.com/role-arn=$ALB_ROLE_ARN" \
