@@ -24,8 +24,21 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region:     ap-southeast-2
       - uses: hashicorp/setup-terraform@v3
-      - name: Destroy-Infrastructure
+      - uses: azure/setup-kubectl@v4
+
+      - name: Configure kubectl
+        run: aws eks update-kubeconfig --name thumbnail-eks --region ap-southeast-2
+
+      - name: Delete K8s resources
+        run: |
+          kubectl delete ingress --all -n thumbnail --ignore-not-found
+          kubectl delete deployment --all -n thumbnail --ignore-not-found
+          kubectl delete service --all -n thumbnail --ignore-not-found
+          echo "Waiting 60s for ALB to be deprovisioned..."
+          sleep 60
+
+      - name: Destroy Infrastructure
         run: |
           cd terraform
-            terraform init -reconfigure
-            terraform destroy -auto-approve
+          terraform init -reconfigure
+          terraform destroy -auto-approve
