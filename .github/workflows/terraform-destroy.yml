@@ -4,7 +4,8 @@ on:
   workflow_dispatch:
 # Shared env vars injected into every job
 env:
-  TF_VAR_s3_bucket_name:   ${{ secrets.S3_BUCKET_NAME }}
+  TF_VAR_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
+  TF_VAR_domain_name:    ${{ secrets.DOMAIN_NAME }}
 
 jobs:
 
@@ -29,13 +30,29 @@ jobs:
       - name: Configure kubectl
         run: aws eks update-kubeconfig --name thumbnail-eks --region ap-southeast-2 || true
 
+      - name: Detach certificate from ingress
+        run: |
+          kubectl annotate ingress thumbnail-ingress -n thumbnail \
+            alb.ingress.kubernetes.io/certificate-arn- \
+            alb.ingress.kubernetes.io/listen-ports- \
+            alb.ingress.kubernetes.io/ssl-redirect- \
+            --ignore-not-found 2>/dev/null || true
+          echo "Waiting 30s for ALB to drop HTTPS listener..."
+          sleep 30
+
       - name: Delete K8s resources
         run: |
           kubectl delete ingress --all -n thumbnail --ignore-not-found 2>/dev/null || true
           kubectl delete deployment --all -n thumbnail --ignore-not-found 2>/dev/null || true
           kubectl delete service --all -n thumbnail --ignore-not-found 2>/dev/null || true
-          echo "Waiting 60s for ALB to be deprovisioned..."
-          sleep 60
+          echo "Waiting 90s for ALB to be fully deprovisioned..."
+          sleep 90
+
+      - name: Destroy Route53
+        run: |
+          cd route53
+          terraform init -reconfigure
+          terraform destroy -auto-approve || true
 
       - name: Destroy Infrastructure
         run: |
