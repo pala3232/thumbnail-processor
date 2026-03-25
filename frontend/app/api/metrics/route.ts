@@ -8,12 +8,12 @@ export async function GET() {
   const res = await fetch(`${API}/api/metrics`, { next: { revalidate: 0 } })
   const d = await res.json()
   return NextResponse.json({
-    totalProcessed:   d.totalThumbnails,
+    totalProcessed:   d.totalThumbnails   ?? 0,
     successRate:      100,
     avgProcessingMs:  0,
-    activePods:       d.runningPods,
-    queueDepth:       d.queueDepth,
-    inFlight:         d.inFlight,
+    activePods:       d.runningPods       ?? 0,
+    queueDepth:       d.queueDepth        ?? 0,
+    inFlight:         d.inFlight          ?? 0,
     throughputPerHour: 0,
   })
 }
