@@ -11,6 +11,14 @@ on:
         options:
           - plan
           - apply
+      step:
+        description: 'Step 1 = zone + cert + NS records | Step 2 = validate + A record + ingress'
+        required: true
+        default: '1'
+        type: choice
+        options:
+          - '1'
+          - '2'
 
 # Shared env vars injected into every job
 env:
@@ -36,7 +44,30 @@ jobs:
           aws-region:     ap-southeast-2
       - uses: hashicorp/setup-terraform@v3
       - uses: azure/setup-kubectl@v4
-      - name: Apply-Plan
+
+      - name: Step 1 — Zone + Cert + Validation Records
+        if: github.event.inputs.step == '1'
+        run: |
+          cd route53
+          terraform init -reconfigure
+          if [ "${{ github.event.inputs.action }}" = "apply" ]; then
+            terraform apply -auto-approve \
+              -target=aws_route53_zone.main \
+              -target=aws_acm_certificate.cert \
+              -target=aws_route53_record.cert_validation
+            echo "========================================"
+            echo "Paste NS records into Namecheap:"
+            echo "========================================"
+            terraform output name_servers
+          else
+            terraform plan \
+              -target=aws_route53_zone.main \
+              -target=aws_acm_certificate.cert \
+              -target=aws_route53_record.cert_validation
+          fi
+
+      - name: Step 2 — Cert Validation + A Record + Ingress
+        if: github.event.inputs.step == '2'
         run: |
           cd route53
           terraform init -reconfigure
@@ -45,11 +76,13 @@ jobs:
           else
             terraform plan
           fi
+
       - name: Update kubeconfig
-        if: github.event.inputs.action == 'apply'
+        if: github.event.inputs.action == 'apply' && github.event.inputs.step == '2'
         run: aws eks update-kubeconfig --region ap-southeast-2 --name thumbnail-eks
+
       - name: Annotate ingress with certificate ARN
-        if: github.event.inputs.action == 'apply'
+        if: github.event.inputs.action == 'apply' && github.event.inputs.step == '2'
         run: |
           cd route53
           CERT_ARN=$(terraform output -raw certificate_arn)
