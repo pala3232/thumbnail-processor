@@ -43,7 +43,7 @@ export default function MetricsBar() {
     return () => clearInterval(id)
   }, [])
 
-  if (!metrics) return (
+  if (!metrics || metrics.totalProcessed === undefined) return (
     <div className="flex gap-3 animate-pulse">
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="flex-1 min-w-[140px] h-20 bg-panel border border-border rounded-xl" />
