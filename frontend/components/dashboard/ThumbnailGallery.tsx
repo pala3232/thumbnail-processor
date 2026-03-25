@@ -53,7 +53,7 @@ export default function ThumbnailGallery() {
   const [filter, setFilter] = useState<string>('all')
 
   useEffect(() => {
-    fetch('/api/thumbnails').then(r => r.json()).then(setThumbs)
+    fetch('/api/thumbnails').then(r => r.json()).then(setThumbs).catch(() => {})
   }, [])
 
   const filtered = filter === 'all' ? thumbs : thumbs.filter(t => t.frame === filter)

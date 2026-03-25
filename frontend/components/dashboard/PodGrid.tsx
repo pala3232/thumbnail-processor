@@ -5,12 +5,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Server, Clock } from 'lucide-react'
 import type { Pod, PodStatus } from '@/lib/types'
 
-const STATUS_CONFIG: Record<PodStatus, { label: string; dot: string; text: string; bg: string }> = {
+const STATUS_CONFIG: Record<string, { label: string; dot: string; text: string; bg: string }> = {
   Running:   { label: 'Running',   dot: 'bg-emerald-400 animate-pulse', text: 'text-emerald-400', bg: 'bg-emerald-400/10 border-emerald-400/20' },
   Pending:   { label: 'Pending',   dot: 'bg-amber-400 animate-pulse',   text: 'text-amber-400',   bg: 'bg-amber-400/10 border-amber-400/20' },
   Succeeded: { label: 'Succeeded', dot: 'bg-zinc-500',                  text: 'text-zinc-400',    bg: 'bg-zinc-800/50 border-zinc-700/30' },
   Failed:    { label: 'Failed',    dot: 'bg-rose-400',                  text: 'text-rose-400',    bg: 'bg-rose-400/10 border-rose-400/20' },
 }
+const FALLBACK_STATUS = { label: 'Unknown', dot: 'bg-zinc-500', text: 'text-zinc-400', bg: 'bg-zinc-800/50 border-zinc-700/30' }
 
 function elapsed(iso: string) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
@@ -20,7 +21,7 @@ function elapsed(iso: string) {
 }
 
 function PodCard({ pod }: { pod: Pod }) {
-  const cfg = STATUS_CONFIG[pod.status]
+  const cfg = STATUS_CONFIG[pod.status] ?? FALLBACK_STATUS
   const [age, setAge] = useState(() => elapsed(pod.startedAt))
 
   useEffect(() => {
