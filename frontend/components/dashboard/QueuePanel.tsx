@@ -22,7 +22,7 @@ export default function QueuePanel() {
     return () => clearInterval(id)
   }, [])
 
-  if (!data) return (
+  if (!data?.current) return (
     <section className="bg-panel border border-border rounded-2xl p-5 animate-pulse h-64" />
   )
 
