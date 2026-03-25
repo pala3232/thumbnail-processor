@@ -9,6 +9,9 @@ REGION="ap-southeast-2"
 echo "Updating kubeconfig for cluster: $CLUSTER_NAME"
 aws eks update-kubeconfig --region "$REGION" --name "$CLUSTER_NAME"
 
+echo "Waiting for ALB controller to be ready..."
+kubectl rollout status deployment/aws-load-balancer-controller -n kube-system --timeout=120s
+
 echo "--- [1/7] Namespace ---"
 kubectl apply -f ../k8s/ns.yaml
 
