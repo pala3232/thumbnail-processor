@@ -35,7 +35,7 @@ module "worker_iam_policy" {
 
 module "worker_iam_role" {
   source    = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version   = "~> 5.0"
+  version   = ">= 5.0, < 5.48"
   role_name = "thumbnail-worker"
 
   oidc_providers = {
@@ -97,7 +97,7 @@ module "api_iam_policy" {
 
 module "api_iam_role" {
   source    = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version   = "~> 5.0"
+  version   = ">= 5.0, < 5.48"
   role_name = "thumbnail-api"
 
   oidc_providers = {
@@ -130,6 +130,7 @@ module "alb_controller_iam_policy" {
           "Action": [
             "iam:CreateServiceLinkedRole",
             "ec2:DescribeAccountAttributes",
+            "ec2:DescribeAvailabilityZones",
             "ec2:DescribeAddresses",
             "ec2:DescribeInternetGateways",
             "ec2:DescribeVpcs",
@@ -283,7 +284,7 @@ module "alb_controller_iam_policy" {
 
 module "alb_controller_iam_role" {
   source    = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version   = "~> 5.0"
+  version   = ">= 5.0, < 5.48"
   role_name = "thumbnail-alb-controller"
 
   oidc_providers = {

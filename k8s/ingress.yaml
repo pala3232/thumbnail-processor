@@ -4,7 +4,6 @@ metadata:
   name: thumbnail-ingress
   namespace: thumbnail
   annotations:
-    kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip          # REQUIRED for Fargate — routes to pod IPs directly
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
