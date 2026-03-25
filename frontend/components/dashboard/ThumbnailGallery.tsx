@@ -13,7 +13,7 @@ const FRAME_COLOR: Record<string, string> = {
 
 function ThumbnailCard({ thumb, index }: { thumb: BackendThumbnail; index: number }) {
   const frameStyle = FRAME_COLOR[thumb.frame] ?? FRAME_COLOR['0%']
-  const videoKey   = thumb.key.replace(/^thumbnails\//, '').replace(/_[123]\.\w+$/, '.mp4')
+  const videoKey   = thumb.key.replace(/^thumbnails\//, '').replace(/_[123]\.\w+$/, '')
 
   return (
     <motion.div

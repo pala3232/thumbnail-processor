@@ -54,10 +54,74 @@ resource "aws_s3_bucket_notification" "upload_notification" {
   bucket = module.s3.s3_bucket_id
 
   queue {
+    id            = "notify-mp4"
     queue_arn     = module.sqs.queue_arn
     events        = ["s3:ObjectCreated:*"]
     filter_prefix = "uploads/"
     filter_suffix = ".mp4"
+  }
+  queue {
+    id            = "notify-mov"
+    queue_arn     = module.sqs.queue_arn
+    events        = ["s3:ObjectCreated:*"]
+    filter_prefix = "uploads/"
+    filter_suffix = ".mov"
+  }
+  queue {
+    id            = "notify-mkv"
+    queue_arn     = module.sqs.queue_arn
+    events        = ["s3:ObjectCreated:*"]
+    filter_prefix = "uploads/"
+    filter_suffix = ".mkv"
+  }
+  queue {
+    id            = "notify-avi"
+    queue_arn     = module.sqs.queue_arn
+    events        = ["s3:ObjectCreated:*"]
+    filter_prefix = "uploads/"
+    filter_suffix = ".avi"
+  }
+  queue {
+    id            = "notify-webm"
+    queue_arn     = module.sqs.queue_arn
+    events        = ["s3:ObjectCreated:*"]
+    filter_prefix = "uploads/"
+    filter_suffix = ".webm"
+  }
+  queue {
+    id            = "notify-wmv"
+    queue_arn     = module.sqs.queue_arn
+    events        = ["s3:ObjectCreated:*"]
+    filter_prefix = "uploads/"
+    filter_suffix = ".wmv"
+  }
+  queue {
+    id            = "notify-flv"
+    queue_arn     = module.sqs.queue_arn
+    events        = ["s3:ObjectCreated:*"]
+    filter_prefix = "uploads/"
+    filter_suffix = ".flv"
+  }
+  queue {
+    id            = "notify-m4v"
+    queue_arn     = module.sqs.queue_arn
+    events        = ["s3:ObjectCreated:*"]
+    filter_prefix = "uploads/"
+    filter_suffix = ".m4v"
+  }
+  queue {
+    id            = "notify-ts"
+    queue_arn     = module.sqs.queue_arn
+    events        = ["s3:ObjectCreated:*"]
+    filter_prefix = "uploads/"
+    filter_suffix = ".ts"
+  }
+  queue {
+    id            = "notify-3gp"
+    queue_arn     = module.sqs.queue_arn
+    events        = ["s3:ObjectCreated:*"]
+    filter_prefix = "uploads/"
+    filter_suffix = ".3gp"
   }
 }
 
