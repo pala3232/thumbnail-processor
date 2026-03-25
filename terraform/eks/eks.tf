@@ -10,6 +10,18 @@ module "eks" {
 
   enable_cluster_creator_admin_permissions = true
 
+  access_entries = {
+    pala = {
+      principal_arn = "arn:aws:iam::359707702022:user/pala"
+      policy_associations = {
+        admin = {
+          policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+          access_scope = { type = "cluster" }
+        }
+      }
+    }
+  }
+
   vpc_id     = var.vpc_id
   subnet_ids = var.private_subnets
 

@@ -10,7 +10,7 @@ echo "Updating kubeconfig for cluster: $CLUSTER_NAME"
 aws eks update-kubeconfig --region "$REGION" --name "$CLUSTER_NAME"
 
 echo "Waiting for ALB controller to be ready..."
-kubectl rollout status deployment/aws-load-balancer-controller -n kube-system --timeout=120s
+kubectl rollout status deployment/aws-load-balancer-controller -n kube-system --timeout=300s
 
 echo "--- [1/7] Namespace ---"
 kubectl apply -f ../k8s/ns.yaml
@@ -42,8 +42,8 @@ kubectl apply -f ../k8s/ingress.yaml
 
 echo ""
 echo "Waiting for api and frontend deployments to be ready..."
-kubectl rollout status deployment/api-deployment -n thumbnail --timeout=120s
-kubectl rollout status deployment/thumbnail-frontend -n thumbnail --timeout=120s
+kubectl rollout status deployment/api-deployment -n thumbnail --timeout=300s
+kubectl rollout status deployment/thumbnail-frontend -n thumbnail --timeout=300s
 
 echo ""
 echo "All manifests applied. ALB provisioning may take 1-2 minutes."
