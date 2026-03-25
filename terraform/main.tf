@@ -51,7 +51,8 @@ module "sqs" {
 # S3 -> SQS event notification
 
 resource "aws_s3_bucket_notification" "upload_notification" {
-  bucket = module.s3.s3_bucket_id
+  bucket     = module.s3.s3_bucket_id
+  depends_on = [aws_sqs_queue_policy.allow_s3]
 
   queue {
     id            = "notify-mp4"

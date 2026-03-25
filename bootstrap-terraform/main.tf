@@ -18,7 +18,7 @@ provider "aws" {
 
 data "aws_caller_identity" "current" {}
 
-# ── tfstate bucket (already exists — manage settings only) ────────────────────
+# tfstate bucket (already exists — manage settings only)
 
 data "aws_s3_bucket" "tfstate" {
   bucket = var.tfstate_bucket
@@ -44,13 +44,13 @@ resource "aws_s3_bucket_public_access_block" "tfstate" {
   restrict_public_buckets = true
 }
 
-# ── GitHub Actions OIDC provider (already exists — look it up) ────────────────
+# GitHub Actions OIDC provider (already exists — look it up)
 
 data "aws_iam_openid_connect_provider" "github" {
   url = "https://token.actions.githubusercontent.com"
 }
 
-# ── GitHub Actions IAM role ────────────────────────────────────────────────────
+# GitHub Actions IAM role 
 
 data "aws_iam_policy_document" "github_assume" {
   statement {
@@ -87,7 +87,7 @@ resource "aws_iam_role_policy_attachment" "github_actions_admin" {
   policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
 }
 
-# ── ECR Repositories ───────────────────────────────────────────────────────────
+# ECR Repositories
 
 resource "aws_ecr_repository" "worker" {
   name                 = "thumbnail-worker"
