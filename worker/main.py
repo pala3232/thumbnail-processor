@@ -9,10 +9,12 @@ Environment variables (from ConfigMap):
   S3_THUMBNAIL_PREFIX  (default: thumbnails/)
 """
 
+import json
 import os
 import logging
 import tempfile
 import time
+from urllib.parse import unquote_plus
 
 import boto3
 import ffmpeg
@@ -30,6 +32,24 @@ FRAME_POSITIONS     = [0.0, 0.5, 1.0]  # 0%, 50%, 100% of video duration
 
 sqs = boto3.client("sqs", region_name=AWS_REGION)
 s3  = boto3.client("s3",  region_name=AWS_REGION)
+
+
+def parse_s3_key(body: str) -> str | None:
+    """Parse SQS message body. Returns S3 key, or None if the message should be skipped."""
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError:
+        return body.strip()  # plain-text key (legacy)
+
+    # AWS sends a test event when the notification is first created — delete and skip
+    if data.get("Event") == "s3:TestEvent":
+        return None
+
+    records = data.get("Records", [])
+    if not records:
+        return None
+
+    return unquote_plus(records[0]["s3"]["object"]["key"])
 
 
 def get_video_duration(path: str) -> float:
@@ -102,8 +122,13 @@ def poll() -> None:
                 continue
 
             msg = messages[0]
-            s3_key = msg["Body"].strip()
             receipt_handle = msg["ReceiptHandle"]
+            s3_key = parse_s3_key(msg["Body"])
+
+            if s3_key is None:
+                sqs.delete_message(QueueUrl=SQS_QUEUE_URL, ReceiptHandle=receipt_handle)
+                log.info("skipped and deleted non-video message")
+                continue
 
             try:
                 process_message(receipt_handle, s3_key)
