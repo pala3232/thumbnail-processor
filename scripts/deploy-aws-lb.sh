@@ -4,7 +4,7 @@ set -e
 ALB_ROLE_ARN=$(cd ../terraform && terraform output -raw alb_controller_role_arn)
 CLUSTER_NAME=$(cd ../terraform && terraform output -raw cluster_name)
 echo "removing existing ALB helm release and CRDs for clean install..."
-helm uninstall aws-load-balancer-controller -n kube-system 2>/dev/null || true
+helm uninstall aws-load-balancer-controller -n kube-system --no-hooks 2>/dev/null || true
 kubectl delete crd ingressclassparams.elbv2.k8s.aws --ignore-not-found
 kubectl delete crd targetgroupbindings.elbv2.k8s.aws --ignore-not-found
 
