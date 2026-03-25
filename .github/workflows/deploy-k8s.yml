@@ -38,6 +38,10 @@ jobs:
           cd terraform
           terraform init -upgrade
 
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --name thumbnail-eks --region ap-southeast-2
+
       - name: Install KEDA
         run: |
           cd scripts
