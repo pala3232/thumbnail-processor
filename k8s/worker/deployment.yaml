@@ -18,7 +18,7 @@ spec:
       serviceAccountName: thumbnail-worker-sa
       containers:
       - name: worker
-        image: 359707702022.dkr.ecr.ap-southeast-2.amazonaws.com/thumbnail-worker:1.0.1
+        image: 359707702022.dkr.ecr.ap-southeast-2.amazonaws.com/thumbnail-worker:1.0.2
         resources:
           requests:
             cpu: "500m"
@@ -33,7 +33,7 @@ spec:
             - "-f"
             - main.py
           initialDelaySeconds: 10
-          periodSeconds: 30
+          periodSeconds: 35
         envFrom:
         - configMapRef:
             name: worker-config

@@ -28,7 +28,7 @@ S3_BUCKET           = os.environ["S3_BUCKET"]
 THUMBNAIL_PREFIX    = os.environ.get("S3_THUMBNAIL_PREFIX", "thumbnails/")
 VISIBILITY_TIMEOUT  = 120   # seconds — must exceed max processing time
 WAIT_TIME           = 20    # long polling — reduces empty receives
-FRAME_POSITIONS     = [0.0, 0.5, 1.0]  # 0%, 50%, 100% of video duration
+FRAME_POSITIONS     = [0.0, 0.5, 0.95]  # 0%, 50%, 95% of video duration
 
 sqs = boto3.client("sqs", region_name=AWS_REGION)
 s3  = boto3.client("s3",  region_name=AWS_REGION)
