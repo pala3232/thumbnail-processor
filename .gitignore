@@ -1,8 +1,7 @@
-*/.terraform
+**/.terraform
 *.tfstate
 *.tfstate.backup
 notes
 frontend-mock/
 frontend/node_modules/
 frontend/.next/
-terraform/bootstrap/.terraform
