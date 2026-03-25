@@ -1,0 +1,38 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: scaledobject-worker
+  namespace: thumbnail
+spec:                  
+  scaleTargetRef:
+    apiVersion:    apps/v1                                 # Optional. Default: apps/v1
+    kind:          Deployment                              # Optional. Default: Deployment
+    name:          worker-deployment                       # Mandatory. Must be in the same namespace as the ScaledObject
+    envSourceContainerName: worker                         # Optional. Default: .spec.template.spec.containers[0]
+  pollingInterval:  30                                     # Optional. Default: 30 seconds
+  cooldownPeriod:   300                                    # Optional. Default: 300 seconds
+  initialCooldownPeriod:  0                                # Optional. Default: 0 seconds
+  idleReplicaCount: 0                                      # Optional. Default: ignored, must be less than minReplicaCount
+  minReplicaCount:  0                                      # Optional. Default: 0
+  maxReplicaCount:  10                                     # Optional. Default: 100
+  fallback:                                                # Optional. Section to specify fallback options
+    failureThreshold: 3                                    # Mandatory if fallback section is included
+    replicas: 1                                            # Mandatory if fallback section is included
+    behavior: static                                       # Optional. Default: "static"
+  advanced:                                                # Optional. Section to specify advanced options
+    restoreToOriginalReplicaCount: true                    # Optional. Default: false
+    horizontalPodAutoscalerConfig:                         # Optional. Section to specify HPA related options
+      behavior:                                            # Optional. Use to modify HPA's scaling behavior
+        scaleDown:
+          stabilizationWindowSeconds: 300
+          policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 15
+  triggers:
+  - type: aws-sqs-queue
+    metadata:
+      queueURL: https://sqs.ap-southeast-2.amazonaws.com/359707702022/thumbnail-pipeline-queue
+      awsRegion: ap-southeast-2
+      targetValue: "5"                                    # Mandatory. The target value to which the metric will be compared against.
+      identityOwner: pod

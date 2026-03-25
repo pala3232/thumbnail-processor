@@ -1,0 +1,14 @@
+[project]
+name = "thumbnail-api"
+version = "0.1.0"
+description = "Pipeline metrics API for the thumbnail dashboard."
+requires-python = ">=3.11"
+
+[tool.setuptools]
+packages = []
+
+[project.dependencies]
+fastapi = ">=0.111.0"
+uvicorn = {version = ">=0.29.0", extras = ["standard"]}
+boto3 = "*"
+kubernetes = "*"

@@ -1,0 +1,14 @@
+[project]
+name = "thumbnail-worker"
+version = "0.1.0"
+description = "Event-driven video thumbnail generator worker."
+authors = ["Your Name <your@email.com>"]
+requires-python = ">=3.11"
+
+[tool.setuptools]
+packages = []
+
+[project.dependencies]
+boto3 = "*"
+botocore = "*"
+ffmpeg-python = "*"

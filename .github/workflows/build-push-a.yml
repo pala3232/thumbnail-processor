@@ -1,0 +1,61 @@
+name: Build Push
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment (e.g. dev, staging, prod). Default: dev'
+        required: false
+        default: 'dev'
+      service:
+        description: 'Service to build and push (frontend, worker, api). Leave blank to build all.'
+        required: false
+        default: ''
+      image_tag:
+        description: 'Image tag (e.g. 1.3.0)'
+        required: true
+
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ap-southeast-2
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push
+        run: |
+          TAG=${{ github.event.inputs.image_tag }}
+          SERVICE=${{ github.event.inputs.service }}
+
+          build_and_push() {
+            local svc=$1
+            case $svc in
+              frontend) ECR_REPO=${{ secrets.ECR_BASE_FRONTEND }} ; BUILD_PATH=./frontend ;;
+              worker)   ECR_REPO=${{ secrets.ECR_BASE_WORKER }}   ; BUILD_PATH=./worker ;;
+              api)      ECR_REPO=${{ secrets.ECR_BASE_API }}      ; BUILD_PATH=./api ;;
+              *)        echo "Unknown service: $svc" ; exit 1 ;;
+            esac
+            docker build -t $ECR_REPO:$TAG $BUILD_PATH
+            docker push $ECR_REPO:$TAG
+          }
+
+          if [ -z "$SERVICE" ]; then
+            for svc in frontend worker api; do
+              build_and_push $svc
+            done
+          else
+            build_and_push $SERVICE
+          fi

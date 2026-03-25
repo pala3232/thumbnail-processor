@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-deployment
+  namespace: thumbnail
+  labels:
+    app: thumbnail-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: thumbnail-api
+  template:
+    metadata:
+      labels:
+        app: thumbnail-api
+    spec:
+      serviceAccountName: thumbnail-api-sa
+      containers:
+      - name: api
+        image: 359707702022.dkr.ecr.ap-southeast-2.amazonaws.com/thumbnail-api
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        envFrom:
+        - configMapRef:
+            name: api-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: thumbnail-api
+  namespace: thumbnail
+  labels:
+    app: thumbnail-api
+spec:
+  selector:
+    app: thumbnail-api
+  ports:
+  - name: http
+    protocol: TCP
+    port: 8000
+    targetPort: 8000

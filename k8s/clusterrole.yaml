@@ -1,0 +1,22 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: thumbnail-api-cr
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: thumbnail-api-crb
+subjects:
+- kind: ServiceAccount
+  name: thumbnail-api-sa
+  namespace: thumbnail
+  apiGroup: ""
+roleRef:
+  kind: ClusterRole
+  name: thumbnail-api-cr
+  apiGroup: rbac.authorization.k8s.io
