@@ -1,6 +1,7 @@
 **/.terraform
 *.tfstate
 *.tfstate.backup
+**/terraform.tfvars
 notes
 frontend-mock/
 frontend/node_modules/
