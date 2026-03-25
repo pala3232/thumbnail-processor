@@ -246,6 +246,20 @@ module "alb_controller_iam_policy" {
         },
         {
           "Effect": "Allow",
+          "Action": ["elasticloadbalancing:AddTags"],
+          "Resource": [
+            "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
+            "arn:aws:elasticloadbalancing:*:*:loadbalancer/net/*/*",
+            "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*"
+          ],
+          "Condition": {
+            "StringEquals": {
+              "elasticloadbalancing:CreateAction": ["CreateTargetGroup", "CreateLoadBalancer", "CreateListener", "CreateRule"]
+            }
+          }
+        },
+        {
+          "Effect": "Allow",
           "Action": [
             "elasticloadbalancing:ModifyLoadBalancerAttributes",
             "elasticloadbalancing:SetIpAddressType",
