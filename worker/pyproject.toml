@@ -3,11 +3,11 @@ name = "thumbnail-worker"
 version = "0.1.0"
 description = "Event-driven video thumbnail generator worker."
 requires-python = ">=3.11"
+dependencies = [
+  "boto3",
+  "botocore",
+  "ffmpeg-python",
+]
 
 [tool.setuptools]
 packages = []
-
-[project.dependencies]
-boto3 = "*"
-botocore = "*"
-ffmpeg-python = "*"
