@@ -22,6 +22,8 @@ export interface BackendPod {
   restarts:  number
   startedAt: string | null
   node:      string | null
+  cpu:       string
+  memory:    string
 }
 
 export interface BackendThumbnail {

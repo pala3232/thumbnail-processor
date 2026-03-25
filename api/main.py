@@ -161,6 +161,8 @@ def _fetch_pods() -> list:
     result = []
     for p in pod_list.items:
         started = p.status.start_time.isoformat() if p.status.start_time else None
+        containers = p.spec.containers or []
+        requests = (containers[0].resources.requests or {}) if containers and containers[0].resources else {}
         result.append({
             "name":      p.metadata.name,
             "status":    p.status.phase,
@@ -168,6 +170,8 @@ def _fetch_pods() -> list:
             "restarts":  sum(cs.restart_count for cs in (p.status.container_statuses or [])),
             "startedAt": started,
             "node":      p.spec.node_name,
+            "cpu":       requests.get("cpu", "—"),
+            "memory":    requests.get("memory", "—"),
         })
     return result
 

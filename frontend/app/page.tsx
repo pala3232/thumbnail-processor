@@ -104,15 +104,15 @@ function LiveBadge({ connected }: { connected: boolean | null }) {
   const isConnected = connected === true
   const isChecking  = connected === null
 
-  const container = isConnected ? 'bg-emerald-400/10 border-emerald-400/30'
-    : isChecking  ? 'bg-zinc-400/10 border-zinc-400/20'
-    : 'bg-rose-400/10 border-rose-400/30'
+  const container = isConnected ? 'bg-emerald-500/20 border-emerald-500/50'
+    : isChecking  ? 'bg-zinc-700/40 border-zinc-600/50'
+    : 'bg-rose-500/20 border-rose-500/50'
 
   const dot = isConnected ? 'bg-emerald-400 animate-pulse'
-    : isChecking  ? 'bg-zinc-500 animate-pulse'
-    : 'bg-rose-400'
+    : isChecking  ? 'bg-zinc-400 animate-pulse'
+    : 'bg-rose-500'
 
-  const text = isConnected ? 'text-emerald-400' : isChecking ? 'text-zinc-500' : 'text-rose-400'
+  const text = isConnected ? 'text-emerald-400' : isChecking ? 'text-zinc-400' : 'text-rose-400'
   const label = isConnected ? 'LIVE' : isChecking ? '...' : 'DOWN'
 
   return (

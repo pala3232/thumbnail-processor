@@ -23,7 +23,6 @@ function elapsed(iso: string) {
 function PodCard({ pod }: { pod: BackendPod }) {
   const cfg = STATUS_CONFIG[pod.status] ?? FALLBACK_STATUS
   const [age, setAge] = useState(() => pod.startedAt ? elapsed(pod.startedAt) : '—')
-
   useEffect(() => {
     if (!pod.startedAt) return
     const id = setInterval(() => setAge(elapsed(pod.startedAt!)), 1000)
@@ -51,16 +50,20 @@ function PodCard({ pod }: { pod: BackendPod }) {
       </div>
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs font-mono">
+        <div className="text-zinc-500">CPU</div>
+        <div className="text-zinc-300">{pod.cpu}</div>
+        <div className="text-zinc-500">Memory</div>
+        <div className="text-zinc-300">{pod.memory}</div>
         <div className="text-zinc-500">Ready</div>
         <div className={pod.ready ? 'text-emerald-400' : 'text-rose-400'}>{pod.ready ? 'Yes' : 'No'}</div>
         <div className="text-zinc-500">Restarts</div>
-        <div className={`${pod.restarts > 0 ? 'text-amber-400' : 'text-zinc-300'}`}>{pod.restarts}</div>
+        <div className={pod.restarts > 0 ? 'text-amber-400' : 'text-zinc-300'}>{pod.restarts}</div>
       </div>
 
       <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-mono border-t border-white/5 pt-2">
         <Clock size={11} />
         <span>{age}</span>
-        <span className="ml-auto truncate text-right max-w-[140px]" title={pod.node ?? ''}>{pod.node ?? '—'}</span>
+        <span className="ml-auto truncate text-right" title={pod.node ?? ''}>{pod.node ?? '—'}</span>
       </div>
     </motion.div>
   )
