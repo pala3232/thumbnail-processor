@@ -14,8 +14,12 @@ export default function QueuePanel() {
 
   useEffect(() => {
     const fetch_ = async () => {
-      const res = await fetch('/api/queue')
-      setData(await res.json())
+      try {
+        const res = await fetch('/api/queue')
+        setData(await res.json())
+      } catch {
+        setData({ current: { depth: 0, inFlight: 0 }, history: [] })
+      }
     }
     fetch_()
     const id = setInterval(fetch_, 5000)

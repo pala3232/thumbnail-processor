@@ -35,8 +35,12 @@ export default function MetricsBar() {
 
   useEffect(() => {
     const fetch_ = async () => {
-      const res = await fetch('/api/metrics')
-      setMetrics(await res.json())
+      try {
+        const res = await fetch('/api/metrics')
+        setMetrics(await res.json())
+      } catch {
+        setMetrics({ totalProcessed: 0, successRate: 0, avgProcessingMs: 0, activePods: 0, queueDepth: 0, inFlight: 0, throughputPerHour: 0 })
+      }
     }
     fetch_()
     const id = setInterval(fetch_, 5000)

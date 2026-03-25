@@ -83,9 +83,15 @@ export default function ThumbnailGallery() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
-        {filtered.map((t, i) => <ThumbnailCard key={t.id} thumb={t} index={i} />)}
-      </div>
+      {filtered.length === 0 ? (
+        <div className="flex items-center justify-center h-32 text-xs font-mono text-zinc-600">
+          No thumbnails yet
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+          {filtered.map((t, i) => <ThumbnailCard key={t.id} thumb={t} index={i} />)}
+        </div>
+      )}
     </section>
   )
 }
