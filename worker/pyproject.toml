@@ -2,7 +2,6 @@
 name = "thumbnail-worker"
 version = "0.1.0"
 description = "Event-driven video thumbnail generator worker."
-authors = [{name = "Your Name", email = "your@email.com"}]
 requires-python = ">=3.11"
 
 [tool.setuptools]
