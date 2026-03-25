@@ -1,7 +1,0 @@
-{
-  "/api/queue/route": "app/api/queue/route.js",
-  "/api/thumbnails/route": "app/api/thumbnails/route.js",
-  "/api/pods/route": "app/api/pods/route.js",
-  "/api/metrics/route": "app/api/metrics/route.js",
-  "/page": "app/page.js"
-}
