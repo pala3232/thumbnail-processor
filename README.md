@@ -23,7 +23,8 @@ SQS → Worker (Fargate Job) → S3 (download video, upload thumbnails)
 | `worker/` | Python worker — polls SQS, generates thumbnails via ffmpeg, uploads to S3 |
 | `k8s/` | Kubernetes manifests (namespace, deployments, services, ingress) |
 | `terraform/` | Infrastructure (EKS, SQS, S3, ECR, IAM) |
-| `.github/workflows/` | CI/CD — build & push to ECR |
+| `scripts/` | Deploy scripts (KEDA, ALB controller, K8s manifests) |
+| `.github/workflows/` | CI/CD — build & push to ECR, deploy infrastructure |
 
 ## Services
 
@@ -49,6 +50,11 @@ Next.js dashboard with:
 - Thumbnail gallery (filterable by frame position)
 
 ## Environment Variables
+
+### frontend
+| Variable | Description |
+|---|---|
+| `API_BASE_URL` | FastAPI service URL (default: `http://thumbnail-api:8000`) |
 
 ### worker
 | Variable | Description |
@@ -79,9 +85,21 @@ Next.js dashboard with:
 - `cloudwatch:GetMetricStatistics`
 - K8s RBAC: `get`, `list` on `pods` in the worker namespace
 
+## Deploy order
+
+```
+1. terraform apply              # VPC, EKS, IAM, S3, SQS, ECR
+2. scripts/deploy-keda.sh       # install KEDA into kube-system
+3. scripts/deploy-aws-lb.sh     # install AWS Load Balancer Controller
+4. build-push-a.yml             # build & push images to ECR
+5. scripts/deploy-k8s.sh        # apply all K8s manifests
+```
+
+Or run steps 2–5 via the `deploy-k8s.yml` workflow (`01 | Deploy Infrastructure`).
+
 ## CI/CD
 
-Workflow: `.github/workflows/build-push-a.yml`
+### Build & push — `.github/workflows/build-push-a.yml`
 
 Trigger: `workflow_dispatch` with inputs:
 - `service`: `frontend`, `worker`, `api` — leave blank to build all
@@ -97,6 +115,7 @@ Secrets required in GitHub:
 ## Kubernetes
 
 - Ingress: AWS Load Balancer Controller (ALB), `target-type: ip` required for Fargate
-- Autoscaling: HPA on the worker deployment based on CPU/memory
+- Worker autoscaling: KEDA `ScaledObject` — scales 0→10 based on SQS queue depth (target: 5 msgs/pod)
+- Frontend/API autoscaling: HPA — scales on CPU (70% threshold, min 1, max 3)
 - Auth: IRSA (IAM Roles for Service Accounts) — no credentials in env vars
 - The api pod needs a ServiceAccount with K8s RBAC to list pods

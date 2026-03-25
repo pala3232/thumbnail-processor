@@ -1,0 +1,31 @@
+name: Destroy infrastructure
+
+on:
+  workflow_dispatch:
+# Shared env vars injected into every job
+env:
+  TF_VAR_s3_bucket_name:   ${{ secrets.S3_BUCKET_NAME }}
+
+jobs:
+
+  # ════════════════════════════════════════════════════════════
+  # DESTROY ALL
+  # ════════════════════════════════════════════════════════════
+
+  network-primary:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region:     ap-southeast-2
+      - uses: hashicorp/setup-terraform@v3
+      - name: Destroy-Infrastructure
+        run: |
+          cd terraform
+            terraform init -reconfigure
+            terraform destroy -auto-approve
