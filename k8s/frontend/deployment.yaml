@@ -18,7 +18,7 @@ spec:
       serviceAccountName: thumbnail-frontend-sa
       containers:
       - name: frontend
-        image: 359707702022.dkr.ecr.ap-southeast-2.amazonaws.com/thumbnail-frontend:1.0.5
+        image: 359707702022.dkr.ecr.ap-southeast-2.amazonaws.com/thumbnail-frontend:1.0.6
         ports:
         - containerPort: 3000
         resources:
