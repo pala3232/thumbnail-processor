@@ -27,7 +27,7 @@ export default function QueuePanel({ data }: { data: BackendQueue | null }) {
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#1e1e35" />
-          <XAxis dataKey="time" tick={{ fill: '#52525b', fontSize: 10, fontFamily: 'monospace' }} tickLine={false} axisLine={false} interval={4} />
+          <XAxis dataKey="time" tick={{ fill: '#52525b', fontSize: 10, fontFamily: 'monospace' }} tickLine={false} axisLine={false} interval={11} />
           <YAxis tick={{ fill: '#52525b', fontSize: 10, fontFamily: 'monospace' }} tickLine={false} axisLine={false} />
           <Tooltip
             contentStyle={{ background: '#12121f', border: '1px solid #1e1e35', borderRadius: 8, fontSize: 11, fontFamily: 'monospace' }}

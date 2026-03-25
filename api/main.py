@@ -1,6 +1,6 @@
 """
 FastAPI service — exposes pipeline data via HTTP and WebSocket.
-Queries: SQS (queue depth), S3 (thumbnails), Kubernetes API (pods), CloudWatch (history).
+Queries: SQS (queue depth + in-memory history), S3 (thumbnails), Kubernetes API (pods).
 
 Environment variables:
   AWS_REGION
@@ -13,6 +13,7 @@ Environment variables:
 import asyncio
 import logging
 import os
+from collections import deque
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any
@@ -75,6 +76,10 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+# ── In-memory queue history (5 min at 5s intervals) ───────────────────────────
+
+_queue_history: deque = deque(maxlen=60)
+
 # ── Sync data helpers (run in thread pool via asyncio.to_thread) ───────────────
 
 def _fetch_metrics() -> dict:
@@ -129,26 +134,12 @@ def _fetch_queue() -> dict:
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
 
-    try:
-        cw  = boto3.client("cloudwatch", region_name=os.environ["AWS_REGION"])
-        now = datetime.now(timezone.utc)
-        resp = cw.get_metric_statistics(
-            Namespace="AWS/SQS",
-            MetricName="ApproximateNumberOfMessagesVisible",
-            Dimensions=[{"Name": "QueueName", "Value": os.environ["SQS_QUEUE_URL"].split("/")[-1]}],
-            StartTime=datetime(now.year, now.month, now.day, now.hour, now.minute - 30, tzinfo=timezone.utc),
-            EndTime=now,
-            Period=60,
-            Statistics=["Average"],
-        )
-        history = [
-            {"time": pt["Timestamp"].strftime("%H:%M"), "depth": int(pt["Average"])}
-            for pt in sorted(resp["Datapoints"], key=lambda x: x["Timestamp"])
-        ]
-    except Exception:
-        history = []
+    _queue_history.append({
+        "time":  datetime.now(timezone.utc).strftime("%H:%M:%S"),
+        "depth": depth,
+    })
 
-    return {"depth": depth, "inFlight": in_flight, "history": history}
+    return {"depth": depth, "inFlight": in_flight, "history": list(_queue_history)}
 
 
 def _fetch_pods() -> list:
@@ -309,6 +300,26 @@ def trigger_test():
             log.error(f"test: failed to copy {key}: {e}")
 
     return {"queued": copied, "skipped": skipped}
+
+
+@app.delete("/api/purge")
+def purge():
+    """Delete all objects under uploads/ and thumbnails/ in the main bucket."""
+    bucket = os.environ["S3_BUCKET"]
+    s3 = get_s3()
+    deleted = 0
+
+    for prefix in ("uploads/", "thumbnails/"):
+        paginator = s3.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+            objects = [{"Key": o["Key"]} for o in page.get("Contents", [])]
+            if not objects:
+                continue
+            s3.delete_objects(Bucket=bucket, Delete={"Objects": objects})
+            deleted += len(objects)
+            log.info(f"purge: deleted {len(objects)} objects from {prefix}")
+
+    return {"deleted": deleted}
 
 # ── WebSocket ──────────────────────────────────────────────────────────────────
 

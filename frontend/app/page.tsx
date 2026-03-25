@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { motion } from 'framer-motion'
-import { Github, Layers, ChevronDown, FlaskConical } from 'lucide-react'
+import { Github, Layers, ChevronDown, FlaskConical, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useRealtimeData } from '@/lib/useRealtimeData'
 import MetricsBar from '@/components/dashboard/MetricsBar'
@@ -92,6 +92,55 @@ function TestButton() {
       <FlaskConical size={12} />
       {state === 'idle'    && 'Test Pipeline'}
       {state === 'loading' && 'Queueing...'}
+      {state === 'success' && result}
+      {state === 'error'   && result}
+    </button>
+  )
+}
+
+// ── Purge button ───────────────────────────────────────────────────────────────
+
+type PurgeState = 'idle' | 'loading' | 'success' | 'error'
+
+function PurgeButton() {
+  const [state, setState] = useState<PurgeState>('idle')
+  const [result, setResult] = useState<string>('')
+
+  const run = async () => {
+    setState('loading')
+    try {
+      const res = await fetch('/api/purge', { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) {
+        setResult(data.detail ?? data.error ?? 'Error')
+        setState('error')
+      } else {
+        setResult(`${data.deleted} object${data.deleted !== 1 ? 's' : ''} deleted`)
+        setState('success')
+      }
+    } catch {
+      setResult('Could not reach API')
+      setState('error')
+    }
+    setTimeout(() => setState('idle'), 4000)
+  }
+
+  const styles: Record<PurgeState, string> = {
+    idle:    'border-zinc-700 text-zinc-400 hover:border-rose-500/60 hover:text-rose-400',
+    loading: 'border-zinc-700 text-zinc-500 cursor-not-allowed',
+    success: 'border-rose-500/40 text-rose-400',
+    error:   'border-rose-500/40 text-rose-400',
+  }
+
+  return (
+    <button
+      onClick={run}
+      disabled={state === 'loading'}
+      className={`flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-lg border transition-colors ${styles[state]}`}
+    >
+      <Trash2 size={12} />
+      {state === 'idle'    && 'Purge'}
+      {state === 'loading' && 'Purging...'}
       {state === 'success' && result}
       {state === 'error'   && result}
     </button>
@@ -208,6 +257,40 @@ function Hero() {
   )
 }
 
+// ── Description ────────────────────────────────────────────────────────────────
+
+function Description() {
+  const [open, setOpen] = useState(false)
+  return (
+    <section className="max-w-2xl mx-auto text-center flex flex-col items-center gap-4 px-4 pb-4">
+      <p className="text-sm text-zinc-400 font-mono leading-relaxed">
+        This project is an event-driven video thumbnail pipeline running entirely on AWS.
+        Upload any video and three thumbnails are automatically extracted. No servers to manage,
+        scales to zero when idle, and back up the moment work arrives.
+      </p>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="text-xs font-mono text-indigo-400 border border-indigo-400/30 rounded-full px-4 py-1.5 hover:bg-indigo-400/10 transition-colors"
+      >
+        {open ? 'Hide' : 'How I built it →'}
+      </button>
+      {open && (
+        <motion.ul
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-sm text-zinc-500 font-mono leading-relaxed text-left flex flex-col gap-3 w-full"
+        >
+          <li><span className="text-zinc-300">Event trigger.</span> Videos uploaded to S3 fire an event notification to SQS, one message per file across 10 supported formats.</li>
+          <li><span className="text-zinc-300">Worker.</span> A KEDA-scaled pod on EKS Fargate picks up the message, downloads the video, extracts three frames at 10%, 50%, and 95% using ffmpeg, and uploads the thumbnails back to S3.</li>
+          <li><span className="text-zinc-300">Autoscaling.</span> The worker scales from zero to one pod per message. Cold starts are the main Fargate tradeoff, kept short with a 15s KEDA polling interval.</li>
+          <li><span className="text-zinc-300">Real-time dashboard.</span> The frontend connects via WebSocket to a FastAPI service broadcasting live state every 5 seconds: pod status from the Kubernetes API, queue depth in-memory at 5s resolution, and thumbnails via presigned S3 URLs.</li>
+          <li><span className="text-zinc-300">Infrastructure.</span> Fully defined in Terraform across separate modules for networking, EKS, IAM, SQS, S3, and DNS, with GitHub Actions workflows for build, deploy, and teardown.</li>
+        </motion.ul>
+      )}
+    </section>
+  )
+}
+
 // ── Home ───────────────────────────────────────────────────────────────────────
 
 export default function Home() {
@@ -217,12 +300,16 @@ export default function Home() {
     <div className="min-h-dvh bg-surface">
       <Header connected={connected} />
       <Hero />
+      <Description />
       <div className="pt-10">
         <main className="max-w-screen-2xl mx-auto px-4 sm:px-6 pb-20 flex flex-col gap-10">
           <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xs font-mono text-zinc-500 uppercase tracking-widest">Overview</h2>
-              <TestButton />
+              <div className="flex items-center gap-2">
+                <PurgeButton />
+                <TestButton />
+              </div>
             </div>
             <MetricsBar metrics={metrics} />
           </section>

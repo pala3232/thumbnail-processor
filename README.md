@@ -5,12 +5,12 @@ Event-driven video thumbnail generator running on EKS Fargate.
 ## Architecture
 
 ```
-Browser ──WebSocket──→ ALB ──/ws──→ FastAPI api service
-        ──HTTP──────→ ALB ──/──→ Next.js frontend
-                                        ↓ (internal)
-                              FastAPI api service → SQS (queue depth + CloudWatch history)
-                                                  → S3  (thumbnails + presigned URLs)
-                                                  → K8s API (pod status)
+Browser ──HTTPS──────→ Route53 (thumbnail.yourdomain.com) → ALB ──/ws──→ FastAPI api service
+        ──WebSocket──→                                         ──/──→ Next.js frontend
+                                                                              ↓ (internal)
+                                                              FastAPI api service → SQS (queue depth + in-memory history)
+                                                                                  → S3  (thumbnails + presigned URLs)
+                                                                                  → K8s API (pod status)
 
 S3 (uploads/) ──event notification──→ SQS ──→ Worker (Fargate) → S3 (thumbnails/)
 ```
@@ -47,7 +47,9 @@ FastAPI service — data source for the frontend.
 **HTTP endpoints (also used as fallback):**
 - `GET /health` — liveness check
 - `GET /api/pods` — pod list from K8s API
-- `GET /api/queue` — SQS queue depth + 30-point CloudWatch history
+- `GET /api/queue` — SQS queue depth + in-memory history (5 min at 5s resolution)
+- `POST /api/test` — copies videos from test source bucket into `uploads/` to trigger the pipeline
+- `DELETE /api/purge` — deletes all objects under `uploads/` and `thumbnails/` in the main bucket
 - `GET /api/thumbnails` — presigned S3 URLs for generated thumbnails
 - `GET /api/metrics` — aggregated pipeline metrics
 
@@ -60,9 +62,10 @@ Next.js dashboard. Connects to the API via WebSocket for real-time updates (reco
 - **Live badge** — green `LIVE` / red `DOWN` based on WebSocket connection state
 - **Overview** — processed thumbnails, running pods, queue depth, in-flight, total pods, storage used
 - **Fargate Pods** — live pod grid with status, ready state, restart count, uptime
-- **Queue Activity** — SQS depth chart (30-min CloudWatch history)
+- **Queue Activity** — SQS depth chart (5-min in-memory history at 5s resolution)
 - **Thumbnail Gallery** — filterable by frame position (10%, 50%, 95%)
 - **Test Pipeline button** — copies videos from the test source bucket into `uploads/` to trigger the pipeline
+- **Purge button** — deletes all uploads and thumbnails from S3 to reset pipeline state
 
 ## Ingress Routing
 
@@ -102,6 +105,7 @@ The worker receives the S3 key as the message body and processes it with ffmpeg 
 | `S3_BUCKET` | Bucket name |
 | `S3_THUMBNAIL_PREFIX` | Prefix for thumbnails (default: `thumbnails/`) |
 | `WORKER_NAMESPACE` | K8s namespace to list pods from (default: `default`) |
+| `TEST_SOURCE_BUCKET` | S3 bucket containing test videos for the Test Pipeline button |
 
 ## Required IAM Permissions
 
@@ -114,8 +118,8 @@ The worker receives the S3 key as the message body and processes it with ffmpeg 
 - `sqs:GetQueueAttributes`
 - `s3:ListBucket`, `s3:GetObject` on the thumbnails prefix
 - `s3:PutObject` on `uploads/` prefix (for Test Pipeline button)
+- `s3:DeleteObject` on the main bucket (for Purge button)
 - `s3:ListBucket`, `s3:GetObject` on the test source bucket
-- `cloudwatch:GetMetricStatistics`
 - K8s RBAC: `get`, `list` on `pods` in the worker namespace
 
 ## Deploy Order
@@ -180,7 +184,7 @@ Or trigger the `bootstrap.yml` workflow from GitHub Actions.
 | `ECR_BASE_WORKER` | ECR repo URI for worker |
 | `ECR_BASE_API` | ECR repo URI for api |
 | `S3_BUCKET_NAME` | S3 bucket name for videos/thumbnails |
-| `DOMAIN_NAME` | Root domain (e.g. `ipalacio.com`) — used by `terraform-global.yml` |
+| `DOMAIN_NAME` | Root domain (e.g. `yourdomain.com`) — used by `terraform-global.yml` |
 
 ## Kubernetes
 

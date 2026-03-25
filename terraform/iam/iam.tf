@@ -85,6 +85,11 @@ module "api_iam_policy" {
         },
         {
           "Effect": "Allow",
+          "Action": ["s3:DeleteObject"],
+          "Resource": "arn:aws:s3:::${var.bucket_name}/*"
+        },
+        {
+          "Effect": "Allow",
           "Action": ["s3:ListBucket"],
           "Resource": "arn:aws:s3:::thumbnail-pipeline-test-source-pala3105"
         },
