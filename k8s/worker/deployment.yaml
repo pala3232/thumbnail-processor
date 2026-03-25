@@ -18,7 +18,7 @@ spec:
       serviceAccountName: thumbnail-worker-sa
       containers:
       - name: worker
-        image: 359707702022.dkr.ecr.ap-southeast-2.amazonaws.com/thumbnail-worker
+        image: 359707702022.dkr.ecr.ap-southeast-2.amazonaws.com/thumbnail-worker:1.0.0
         resources:
           requests:
             cpu: "500m"
