@@ -2,7 +2,7 @@
 
 module "worker_iam_policy" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-policy"
-  version = "~> 5.0"
+  version = ">= 5.0, < 5.48"
 
   name        = "thumbnail-worker-policy"
   description = "Policy for the thumbnail worker"
@@ -54,7 +54,7 @@ module "worker_iam_role" {
 
 module "api_iam_policy" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-policy"
-  version = "~> 5.0"
+  version = ">= 5.0, < 5.48"
 
   name        = "thumbnail-api-policy"
   description = "Policy for the thumbnail API service"
@@ -116,7 +116,7 @@ module "api_iam_role" {
 
 module "alb_controller_iam_policy" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-policy"
-  version = "~> 5.0"
+  version = ">= 5.0, < 5.48"
 
   name        = "thumbnail-alb-controller-policy"
   description = "Official AWS Load Balancer Controller policy"

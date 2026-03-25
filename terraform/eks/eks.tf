@@ -20,7 +20,8 @@ module "eks" {
 }
 
 module "fargate_profile" {
-  source = "terraform-aws-modules/eks/aws//modules/fargate-profile"
+  source  = "terraform-aws-modules/eks/aws//modules/fargate-profile"
+  version = "~> 20.0"
 
   name         = "separate-fargate-profile"
   cluster_name = module.eks.cluster_name
@@ -37,7 +38,8 @@ module "fargate_profile" {
 }
 
 module "fargate_profile_worker" {
-  source = "terraform-aws-modules/eks/aws//modules/fargate-profile"
+  source  = "terraform-aws-modules/eks/aws//modules/fargate-profile"
+  version = "~> 20.0"
 
   name         = "worker-fargate-profile"
   cluster_name = module.eks.cluster_name

@@ -36,7 +36,7 @@ jobs:
       - name: Terraform Init
         run: |
           cd terraform
-          terraform init
+          terraform init -upgrade
 
       - name: Install KEDA
         run: |
