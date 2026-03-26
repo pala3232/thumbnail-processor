@@ -23,10 +23,10 @@ env:
 jobs:
 
   # ════════════════════════════════════════════════════════════
-  # PHASE 1 — Infra + Build + K8s + Route53 step 1
+  # PHASE 1 — parallel: infra + builds + route53 step1
   # ════════════════════════════════════════════════════════════
 
-  phase-1:
+  terraform-infra:
     if: github.event.inputs.phase == '1'
     runs-on: ubuntu-latest
     permissions:
@@ -34,38 +34,101 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ap-southeast-2
-
       - uses: hashicorp/setup-terraform@v3
-      - uses: azure/setup-helm@v4
-        with:
-          version: latest
-      - uses: azure/setup-kubectl@v4
-
-      # ── Terraform infra ──────────────────────────────────────
       - name: Terraform Apply — Infrastructure
         run: |
           cd terraform
           terraform init -reconfigure
           terraform apply -auto-approve
 
-      # ── Build & push images ──────────────────────────────────
-      - name: Login to ECR
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build and push all images
+  build-images:
+    if: github.event.inputs.phase == '1'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - service: frontend
+            build_path: frontend
+          - service: worker
+            build_path: worker
+          - service: api
+            build_path: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ap-southeast-2
+      - uses: aws-actions/amazon-ecr-login@v2
+      - name: Build and push ${{ matrix.service }}
         run: |
           TAG=${{ github.event.inputs.image_tag }}
           if [ -z "$TAG" ]; then echo "ERROR: image_tag is required for Phase 1" && exit 1; fi
-          docker build -t ${{ secrets.ECR_BASE_FRONTEND }}:$TAG ./frontend && docker push ${{ secrets.ECR_BASE_FRONTEND }}:$TAG
-          docker build -t ${{ secrets.ECR_BASE_WORKER }}:$TAG   ./worker   && docker push ${{ secrets.ECR_BASE_WORKER }}:$TAG
-          docker build -t ${{ secrets.ECR_BASE_API }}:$TAG      ./api      && docker push ${{ secrets.ECR_BASE_API }}:$TAG
+          if [ "${{ matrix.service }}" = "frontend" ]; then ECR=${{ secrets.ECR_BASE_FRONTEND }}; fi
+          if [ "${{ matrix.service }}" = "worker" ];   then ECR=${{ secrets.ECR_BASE_WORKER }};   fi
+          if [ "${{ matrix.service }}" = "api" ];      then ECR=${{ secrets.ECR_BASE_API }};      fi
+          docker build -t $ECR:$TAG ./${{ matrix.build_path }}
+          docker push $ECR:$TAG
 
-      # ── Deploy K8s ───────────────────────────────────────────
+  route53-step1:
+    if: github.event.inputs.phase == '1'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ap-southeast-2
+      - uses: hashicorp/setup-terraform@v3
+      - name: Route53 — Zone + Cert + NS records
+        run: |
+          cd route53
+          terraform init -reconfigure
+          terraform apply -auto-approve \
+            -target=aws_route53_zone.main \
+            -target=aws_acm_certificate.cert \
+            -target=aws_route53_record.cert_validation
+          echo "========================================"
+          echo "Set these NS records in Namecheap, then run Phase 2:"
+          echo "========================================"
+          terraform output name_servers
+
+  # ════════════════════════════════════════════════════════════
+  # PHASE 1 — sequential: deploy k8s (after infra + builds)
+  # ════════════════════════════════════════════════════════════
+
+  deploy-k8s:
+    if: github.event.inputs.phase == '1'
+    needs: [terraform-infra, build-images]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ap-southeast-2
+      - uses: hashicorp/setup-terraform@v3
+      - uses: azure/setup-helm@v4
+        with:
+          version: latest
+      - uses: azure/setup-kubectl@v4
+
+      - name: Terraform Init
+        run: cd terraform && terraform init -reconfigure
+
       - name: Configure kubectl
         run: aws eks update-kubeconfig --name thumbnail-eks --region ap-southeast-2
 
@@ -93,20 +156,6 @@ jobs:
       - name: Deploy K8s manifests
         run: cd scripts && chmod +x deploy-k8s.sh && ./deploy-k8s.sh
 
-      # ── Route53 step 1 ───────────────────────────────────────
-      - name: Route53 — Zone + Cert + NS records
-        run: |
-          cd route53
-          terraform init -reconfigure
-          terraform apply -auto-approve \
-            -target=aws_route53_zone.main \
-            -target=aws_acm_certificate.cert \
-            -target=aws_route53_record.cert_validation
-          echo "========================================"
-          echo "Set these NS records in Namecheap, then run Phase 2:"
-          echo "========================================"
-          terraform output name_servers
-
   # ════════════════════════════════════════════════════════════
   # PHASE 2 — Route53 step 2 + Monitoring
   # (run after NS records are set in Namecheap)
@@ -120,16 +169,13 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ap-southeast-2
-
       - uses: hashicorp/setup-terraform@v3
       - uses: azure/setup-kubectl@v4
 
-      # ── Route53 step 2 ───────────────────────────────────────
       - name: Route53 — Cert validation + A record
         run: |
           cd route53
@@ -149,7 +195,6 @@ jobs:
             alb.ingress.kubernetes.io/ssl-redirect='443' \
             --overwrite
 
-      # ── Monitoring ───────────────────────────────────────────
       - name: Terraform Apply — Monitoring
         run: |
           cd terraform-monitoring
