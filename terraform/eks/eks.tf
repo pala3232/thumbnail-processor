@@ -42,7 +42,7 @@ module "eks" {
 }
 
 resource "aws_security_group_rule" "node_ingress_from_cluster_primary" {
-  description              = "Cluster primary SG to node — allows Fargate pods to reach EC2 node (CoreDNS, etc.)"
+  description              = "Cluster primary SG to node - allows Fargate pods to reach EC2 node"
   type                     = "ingress"
   from_port                = 0
   to_port                  = 0
