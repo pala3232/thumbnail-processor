@@ -8,6 +8,7 @@ metadata:
     alb.ingress.kubernetes.io/target-type: ip          # REQUIRED for Fargate — routes to pod IPs directly
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80},{"HTTPS": 443}]'
     alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=3600
+    alb.ingress.kubernetes.io/healthcheck-path: /health
 spec:
   ingressClassName: alb
   rules:

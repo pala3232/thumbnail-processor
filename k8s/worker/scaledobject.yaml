@@ -10,7 +10,7 @@ spec:
     name:          worker-deployment                       # Mandatory. Must be in the same namespace as the ScaledObject
     envSourceContainerName: worker                         # Optional. Default: .spec.template.spec.containers[0]
   pollingInterval:  15                                     # Optional. Default: 30 seconds
-  cooldownPeriod:   300                                    # Optional. Default: 300 seconds
+  cooldownPeriod:   90                                    # Optional. Default: 300 seconds
   initialCooldownPeriod:  0                                # Optional. Default: 0 seconds
   idleReplicaCount: 0                                      # Optional. Default: ignored, must be less than minReplicaCount
   minReplicaCount:  0                                      # Optional. Default: 0
@@ -24,7 +24,7 @@ spec:
     horizontalPodAutoscalerConfig:                         # Optional. Section to specify HPA related options
       behavior:                                            # Optional. Use to modify HPA's scaling behavior
         scaleDown:
-          stabilizationWindowSeconds: 300
+          stabilizationWindowSeconds: 90
           policies:
           - type: Percent
             value: 100
