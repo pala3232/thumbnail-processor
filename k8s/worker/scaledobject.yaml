@@ -34,5 +34,5 @@ spec:
     metadata:
       queueURL: https://sqs.ap-southeast-2.amazonaws.com/359707702022/thumbnail-pipeline-queue
       awsRegion: ap-southeast-2
-      targetValue: "1"                                    # Mandatory. The target value to which the metric will be compared against.
+      targetValue: "3"                                    # Mandatory. The target value to which the metric will be compared against.
       identityOwner: pod

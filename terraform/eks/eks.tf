@@ -43,6 +43,10 @@ module "fargate_profile" {
     namespace = "kube-system"
   }]
 
+  iam_role_additional_policies = {
+    CloudWatchAgentServerPolicy = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+  }
+
   tags = {
     Environment = "dev"
     Terraform   = "true"
@@ -60,4 +64,50 @@ module "fargate_profile_worker" {
   selectors = [{
     namespace = "thumbnail"
   }]
+
+  iam_role_additional_policies = {
+    CloudWatchAgentServerPolicy = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+  }
+}
+
+module "fargate_profile_cloudwatch" {
+  source  = "terraform-aws-modules/eks/aws//modules/fargate-profile"
+  version = "~> 20.0"
+
+  name         = "cloudwatch-fargate-profile"
+  cluster_name = module.eks.cluster_name
+  subnet_ids   = var.private_subnets
+
+  selectors = [{
+    namespace = "amazon-cloudwatch"
+  }]
+
+  iam_role_additional_policies = {
+    CloudWatchAgentServerPolicy = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+  }
+}
+
+module "cloudwatch_observability_irsa" {
+  source    = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version   = ">= 5.0, < 5.48"
+  role_name = "thumbnail-cloudwatch-observability"
+
+  attach_cloudwatch_observability_policy = true
+
+  oidc_providers = {
+    main = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["amazon-cloudwatch:cloudwatch-agent"]
+    }
+  }
+}
+
+resource "aws_eks_addon" "cloudwatch_observability" {
+  cluster_name             = module.eks.cluster_name
+  addon_name               = "amazon-cloudwatch-observability"
+  service_account_role_arn = module.cloudwatch_observability_irsa.iam_role_arn
+
+  depends_on = [
+    module.fargate_profile_cloudwatch,
+  ]
 }

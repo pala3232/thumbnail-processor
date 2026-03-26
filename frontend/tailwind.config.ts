@@ -12,10 +12,6 @@ const config: Config = {
         panel: '#12121f',
         border: '#1e1e35',
         accent: '#6366f1',
-        cyan: '#06b6d4',
-        emerald: '#10b981',
-        amber: '#f59e0b',
-        rose: '#f43f5e',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

@@ -6,7 +6,6 @@ metadata:
   labels:
     app: thumbnail-worker
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: thumbnail-worker

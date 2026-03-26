@@ -1,0 +1,43 @@
+name: Terraform Monitoring
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform action'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+jobs:
+  monitoring:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region:     ap-southeast-2
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: cd terraform-monitoring && terraform init -reconfigure
+
+      - name: Terraform Plan
+        if: github.event.inputs.action == 'plan'
+        run: cd terraform-monitoring && terraform plan -var="endpoint=${{ secrets.ALERT_EMAIL }}"
+
+      - name: Terraform Apply
+        if: github.event.inputs.action == 'apply'
+        run: cd terraform-monitoring && terraform apply -auto-approve -var="endpoint=${{ secrets.ALERT_EMAIL }}"
+
+      - name: Terraform Destroy
+        if: github.event.inputs.action == 'destroy'
+        run: cd terraform-monitoring && terraform destroy -auto-approve -var="endpoint=${{ secrets.ALERT_EMAIL }}"
