@@ -303,7 +303,7 @@ def trigger_test():
 
 
 @app.delete("/api/purge")
-def purge():
+async def purge():
     """Delete all objects under uploads/ and thumbnails/ in the main bucket."""
     bucket = os.environ["S3_BUCKET"]
     s3 = get_s3()
@@ -318,6 +318,10 @@ def purge():
             s3.delete_objects(Bucket=bucket, Delete={"Objects": objects})
             deleted += len(objects)
             log.info(f"purge: deleted {len(objects)} objects from {prefix}")
+
+    # Broadcast immediately so connected clients see empty gallery without waiting
+    state = await collect_state()
+    await manager.broadcast(state)
 
     return {"deleted": deleted}
 
