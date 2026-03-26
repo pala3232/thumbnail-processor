@@ -49,18 +49,19 @@ jobs:
             2>/dev/null || true
           kubectl rollout status deployment/coredns -n kube-system --timeout=120s
 
+      - name: Annotate KEDA service account with IAM role
+        run: |
+          KEDA_ROLE_ARN=$(cd terraform && terraform output -raw keda_role_arn)
+          kubectl create serviceaccount keda-operator -n kube-system --dry-run=client -o yaml | kubectl apply -f -
+          kubectl annotate serviceaccount keda-operator -n kube-system \
+            eks.amazonaws.com/role-arn=$KEDA_ROLE_ARN \
+            --overwrite
+
       - name: Install KEDA
         run: |
           cd scripts
           chmod +x deploy-keda.sh
           ./deploy-keda.sh
-
-      - name: Annotate KEDA service account with IAM role
-        run: |
-          KEDA_ROLE_ARN=$(cd terraform && terraform output -raw keda_role_arn)
-          kubectl annotate serviceaccount keda-operator -n kube-system \
-            eks.amazonaws.com/role-arn=$KEDA_ROLE_ARN \
-            --overwrite
 
       - name: Install ALB Controller
         run: |
