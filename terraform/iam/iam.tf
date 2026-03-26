@@ -85,7 +85,7 @@ module "api_iam_policy" {
         },
         {
           "Effect": "Allow",
-          "Action": ["s3:DeleteObject"],
+          "Action": ["s3:DeleteObject", "s3:DeleteObjectVersion"],
           "Resource": "arn:aws:s3:::${var.bucket_name}/*"
         },
         {
