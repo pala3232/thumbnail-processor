@@ -67,7 +67,7 @@ jobs:
         run: |
           cd route53
           terraform init -reconfigure
-          terraform destroy -auto-approve || true
+          terraform destroy -auto-approve -refresh=false || true
 
       - name: Destroy Infrastructure
         run: |
@@ -76,4 +76,4 @@ jobs:
           terraform state rm 'module.ecr.aws_ecr_repository.worker' 2>/dev/null || true
           terraform state rm 'module.ecr.aws_ecr_repository.frontend' 2>/dev/null || true
           terraform state rm 'module.ecr.aws_ecr_repository.api' 2>/dev/null || true
-          terraform destroy -auto-approve
+          terraform destroy -auto-approve -refresh=false
