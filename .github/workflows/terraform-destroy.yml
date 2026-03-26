@@ -48,6 +48,12 @@ jobs:
           echo "Waiting 90s for ALB to be fully deprovisioned..."
           sleep 90
 
+      - name: Destroy Monitoring
+        run: |
+          cd terraform-monitoring
+          terraform init -reconfigure
+          terraform destroy -auto-approve -var="endpoint=${{ secrets.ALERT_EMAIL }}" || true
+
       - name: Destroy Route53
         run: |
           cd route53
