@@ -26,21 +26,13 @@ module "eks" {
   subnet_ids = var.private_subnets
 
   node_security_group_additional_rules = {
-    ingress_cluster_coredns_tcp = {
-      description                   = "Cluster SG to node CoreDNS TCP"
-      protocol                      = "tcp"
-      from_port                     = 53
-      to_port                       = 53
-      type                          = "ingress"
-      source_cluster_security_group = true
-    }
-    ingress_cluster_coredns_udp = {
-      description                   = "Cluster SG to node CoreDNS UDP"
-      protocol                      = "udp"
-      from_port                     = 53
-      to_port                       = 53
-      type                          = "ingress"
-      source_cluster_security_group = true
+    ingress_cluster_primary_all = {
+      description              = "Cluster primary SG to node — allows Fargate pods to reach EC2 node (CoreDNS, etc.)"
+      protocol                 = "-1"
+      from_port                = 0
+      to_port                  = 0
+      type                     = "ingress"
+      source_security_group_id = module.eks.cluster_primary_security_group_id
     }
   }
 
