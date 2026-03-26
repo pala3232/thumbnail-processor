@@ -141,9 +141,9 @@ jobs:
           echo "Waiting for CoreDNS pods to be ready..."
           for i in $(seq 1 30); do
             READY=$(kubectl get deployment coredns -n kube-system \
-              -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+              -o jsonpath='{.status.readyReplicas}' 2>/dev/null); READY=${READY:-0}
             DESIRED=$(kubectl get deployment coredns -n kube-system \
-              -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "2")
+              -o jsonpath='{.spec.replicas}' 2>/dev/null); DESIRED=${DESIRED:-2}
             echo "CoreDNS ready: $READY/$DESIRED"
             [ "$READY" = "$DESIRED" ] && echo "CoreDNS is ready." && break
             sleep 15
@@ -155,6 +155,11 @@ jobs:
           kubectl create serviceaccount keda-operator -n kube-system --dry-run=client -o yaml | kubectl apply -f -
           kubectl annotate serviceaccount keda-operator -n kube-system \
             eks.amazonaws.com/role-arn=$KEDA_ROLE_ARN \
+            meta.helm.sh/release-name=keda \
+            meta.helm.sh/release-namespace=kube-system \
+            --overwrite
+          kubectl label serviceaccount keda-operator -n kube-system \
+            app.kubernetes.io/managed-by=Helm \
             --overwrite
 
       - name: Install KEDA
