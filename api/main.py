@@ -310,14 +310,17 @@ async def purge():
     deleted = 0
 
     for prefix in ("uploads/", "thumbnails/"):
-        paginator = s3.get_paginator("list_objects_v2")
+        paginator = s3.get_paginator("list_object_versions")
         for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
-            objects = [{"Key": o["Key"]} for o in page.get("Contents", [])]
+            objects = [
+                {"Key": o["Key"], "VersionId": o["VersionId"]}
+                for o in page.get("Versions", []) + page.get("DeleteMarkers", [])
+            ]
             if not objects:
                 continue
             s3.delete_objects(Bucket=bucket, Delete={"Objects": objects})
             deleted += len(objects)
-            log.info(f"purge: deleted {len(objects)} objects from {prefix}")
+            log.info(f"purge: deleted {len(objects)} versions from {prefix}")
 
     # Broadcast immediately so connected clients see empty gallery without waiting
     state = await collect_state()
