@@ -47,7 +47,17 @@ jobs:
           kubectl patch deployment coredns -n kube-system --type json \
             -p='[{"op":"remove","path":"/spec/template/metadata/annotations/eks.amazonaws.com~1compute-type"}]' \
             2>/dev/null || true
-          kubectl rollout status deployment/coredns -n kube-system --timeout=120s
+          kubectl rollout restart deployment/coredns -n kube-system
+          echo "Waiting for CoreDNS pods to be ready..."
+          for i in $(seq 1 30); do
+            READY=$(kubectl get deployment coredns -n kube-system \
+              -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+            DESIRED=$(kubectl get deployment coredns -n kube-system \
+              -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "2")
+            echo "CoreDNS ready: $READY/$DESIRED"
+            [ "$READY" = "$DESIRED" ] && echo "CoreDNS is ready." && break
+            sleep 15
+          done
 
       - name: Annotate KEDA service account with IAM role
         run: |
