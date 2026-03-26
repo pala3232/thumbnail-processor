@@ -70,7 +70,7 @@ module "api_iam_policy" {
         },
         {
           "Effect": "Allow",
-          "Action": ["s3:ListBucket"],
+          "Action": ["s3:ListBucket", "s3:ListBucketVersions"],
           "Resource": "arn:aws:s3:::${var.bucket_name}"
         },
         {
