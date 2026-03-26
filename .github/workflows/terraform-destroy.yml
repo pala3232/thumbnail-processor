@@ -56,6 +56,14 @@ jobs:
             echo "ALB still present, waiting... ($i/20)"
             sleep 15
           done
+          ALB_ARNS=$(aws elbv2 describe-load-balancers \
+            --query "LoadBalancers[?contains(LoadBalancerName,'thumbnai')].LoadBalancerArn" \
+            --output text 2>/dev/null || true)
+          for ARN in $ALB_ARNS; do
+            echo "Force-deleting leftover ALB: $ARN"
+            aws elbv2 delete-load-balancer --load-balancer-arn "$ARN" || true
+          done
+          [ -n "$ALB_ARNS" ] && sleep 30 || true
 
       - name: Destroy Monitoring
         run: |
