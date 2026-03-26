@@ -34,7 +34,8 @@ echo "--- [5/7] HPAs ---"
 kubectl apply -f ../k8s/api/hpa.yaml
 kubectl apply -f ../k8s/frontend/hpa.yaml
 
-echo "--- [6/7] KEDA ScaledObject ---"
+echo "--- [6/7] KEDA ScaledObject + TriggerAuthentication ---"
+kubectl apply -f ../k8s/worker/trigger-auth.yaml
 kubectl apply -f ../k8s/worker/scaledobject.yaml
 
 echo "--- [7/7] Ingress ---"

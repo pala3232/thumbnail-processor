@@ -42,17 +42,26 @@ jobs:
 
       - name: Delete K8s resources
         run: |
+          kubectl patch ingress thumbnail-ingress -n thumbnail \
+            -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
           kubectl delete ingress --all -n thumbnail --ignore-not-found 2>/dev/null || true
           kubectl delete deployment --all -n thumbnail --ignore-not-found 2>/dev/null || true
           kubectl delete service --all -n thumbnail --ignore-not-found 2>/dev/null || true
-          echo "Waiting 90s for ALB to be fully deprovisioned..."
-          sleep 90
+          echo "Waiting for ALB to be fully deprovisioned..."
+          for i in $(seq 1 20); do
+            COUNT=$(aws elbv2 describe-load-balancers \
+              --query "length(LoadBalancers[?contains(LoadBalancerName,'thumbnai')])" \
+              --output text 2>/dev/null || echo "0")
+            [ "$COUNT" = "0" ] && echo "ALB gone." && break
+            echo "ALB still present, waiting... ($i/20)"
+            sleep 15
+          done
 
       - name: Destroy Monitoring
         run: |
           cd terraform-monitoring
           terraform init -reconfigure
-          terraform destroy -auto-approve -var="endpoint=${{ secrets.ALERT_EMAIL }}" || true
+          terraform destroy -auto-approve -refresh=false -var="endpoint=${{ secrets.ALERT_EMAIL }}" || true
 
       - name: Destroy Route53
         run: |
