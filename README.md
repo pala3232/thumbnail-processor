@@ -1,6 +1,6 @@
 # Thumbnail Pipeline
 
-Event-driven video thumbnail generator running on EKS Fargate.
+Event-driven video thumbnail generator running on EKS (hybrid EC2 + Fargate).
 
 ## Architecture
 
@@ -77,6 +77,10 @@ Next.js dashboard. Connects to the API via WebSocket for real-time updates (reco
 
 ALB idle timeout set to 3600s to keep WebSocket connections alive.
 
+ALB health check path set to `/health` for all backends — the API serves `GET /health` returning 200, and the frontend serves `GET /health` via a Next.js route. Without this, ALB defaults to checking `/` on the API (which returns 404), marking the target unhealthy and dropping new WebSocket connections.
+
+Uvicorn WebSocket ping interval set to 3600s — ALB does not correctly handle protocol-level ping/pong frames on backend connections. The 5s application broadcast keeps the connection alive; protocol pings are unnecessary and cause disconnects.
+
 ## S3 Event Trigger
 
 Videos uploaded to `uploads/` in the S3 bucket automatically trigger an SQS message via S3 event notification. Supported extensions: `.mp4 .mov .mkv .avi .webm .wmv .flv .m4v .ts .3gp`
@@ -135,7 +139,19 @@ The worker receives the S3 key as the message body and processes it with ffmpeg 
 
 Or trigger the `bootstrap.yml` workflow from GitHub Actions.
 
-### Every deploy
+### Every deploy — automated (recommended)
+
+```
+2. deploy-all.yml → phase: 1
+   # Runs in parallel: terraform-apply, build all 3 images, route53 step 1
+   # Then: deploy-k8s (waits for terraform + images)
+   # Outputs NS records — paste into Namecheap Custom DNS, wait for propagation
+
+3. deploy-all.yml → phase: 2
+   # Runs: route53 step 2 (ACM validation + A record), ingress HTTPS annotation, monitoring
+```
+
+### Every deploy — manual (step by step)
 
 ```
 2. terraform-apply.yml          # VPC, EKS, IAM, SQS, S3, S3→SQS notification
@@ -160,9 +176,11 @@ Or trigger the `bootstrap.yml` workflow from GitHub Actions.
 ### Tear down
 
 ```
-8. terraform-destroy.yml    # deletes K8s resources, waits for ALB, then terraform destroy
+8. terraform-destroy.yml
+   # Deletes K8s resources, lets ALB controller clean up ALB + security groups via finalizer
+   # Falls back to force-delete + orphaned SG cleanup if controller fails
+   # Then terraform destroy (monitoring → route53 → infra)
    # ECR repos are NOT destroyed (managed by bootstrap)
-   # Note: destroy route53/ separately if needed (terraform destroy in route53/)
 ```
 
 ## CI/CD Workflows
@@ -170,6 +188,7 @@ Or trigger the `bootstrap.yml` workflow from GitHub Actions.
 | Workflow | Trigger | Description |
 |---|---|---|
 | `bootstrap.yml` | manual | One-time: GH Actions role, ECR repos |
+| `deploy-all.yml` | manual | **Full deploy in two phases** — phase 1: terraform + images + k8s in parallel; phase 2: HTTPS + monitoring |
 | `terraform-apply.yml` | manual | Provision VPC, EKS, IAM, SQS, S3 |
 | `build-push-a.yml` | manual | Build & push Docker images to ECR |
 | `deploy-k8s.yml` | manual | Deploy KEDA, ALB controller, K8s manifests |
@@ -191,21 +210,22 @@ Or trigger the `bootstrap.yml` workflow from GitHub Actions.
 
 ## Kubernetes
 
-- **Ingress:** AWS Load Balancer Controller (ALB), `target-type: ip` required for Fargate
-- **Worker autoscaling:** KEDA `ScaledObject` — scales 0→10 based on SQS queue depth (1 pod per 3 messages, polling every 15s)
-- **Frontend/API autoscaling:** HPA — scales on CPU (70% threshold, min 1, max 3)
+- **Compute:** hybrid — EC2 managed node group (t3.medium, 1–3 nodes) for frontend, API, and control-plane workloads; Fargate for the worker only (`app=thumbnail-worker` label selector)
+- **Ingress:** AWS Load Balancer Controller (ALB), `target-type: ip`
+- **Worker autoscaling:** KEDA `ScaledObject` — scales 0→10 based on SQS queue depth (1 pod per 3 messages, polling every 15s, cooldown 90s)
+- **Frontend/API autoscaling:** HPA — scales on CPU (70% threshold, min 1, max 3, stabilization window 90s)
 - **Auth:** IRSA (IAM Roles for Service Accounts) — no static credentials in env vars
-- **CoreDNS:** Fargate-compatible — `eks.amazonaws.com/compute-type: ec2` annotation patched out on deploy
+- **KEDA service account:** pre-created with Helm ownership annotations (`meta.helm.sh/release-name`, `meta.helm.sh/release-namespace`, `app.kubernetes.io/managed-by=Helm`) before KEDA install to avoid Helm ownership conflict
 - **NAT Gateway:** single NAT gateway for outbound internet access (ECR, SQS, S3 via gateway endpoint)
 
 ## Observability
 
 ### Container Insights
-Enabled via the `amazon-cloudwatch-observability` EKS add-on. On Fargate, the agent is injected as a sidecar into pods automatically. Metrics available in CloudWatch under the `ContainerInsights` namespace:
+Enabled via the `amazon-cloudwatch-observability` EKS add-on. On EC2 nodes, the agent runs as a DaemonSet. On Fargate (worker), it is injected as a sidecar automatically. Metrics available in CloudWatch under the `ContainerInsights` namespace:
 - Pod CPU and memory usage
 - Pod network I/O
 - Container restarts
-- Fargate vCPU and memory
+- Node and Fargate vCPU and memory
 
 ### CloudWatch Alarms (`terraform-monitoring/`)
 All alarms notify via SNS email (configured via `ALERT_EMAIL` secret).
