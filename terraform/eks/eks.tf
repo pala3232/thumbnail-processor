@@ -25,6 +25,25 @@ module "eks" {
   vpc_id     = var.vpc_id
   subnet_ids = var.private_subnets
 
+  node_security_group_additional_rules = {
+    ingress_cluster_coredns_tcp = {
+      description                   = "Cluster SG to node CoreDNS TCP"
+      protocol                      = "tcp"
+      from_port                     = 53
+      to_port                       = 53
+      type                          = "ingress"
+      source_cluster_security_group = true
+    }
+    ingress_cluster_coredns_udp = {
+      description                   = "Cluster SG to node CoreDNS UDP"
+      protocol                      = "udp"
+      from_port                     = 53
+      to_port                       = 53
+      type                          = "ingress"
+      source_cluster_security_group = true
+    }
+  }
+
   eks_managed_node_groups = {
     main = {
       instance_types = ["t3.medium"]
