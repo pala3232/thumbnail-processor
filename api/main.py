@@ -185,7 +185,7 @@ def _fetch_thumbnails() -> list:
                 )
                 stem      = key.rsplit(".", 1)[0]
                 suffix    = stem[-1] if stem[-1].isdigit() else "1"
-                frame_map = {"1": "0%", "2": "50%", "3": "100%"}
+                frame_map = {"1": "10%", "2": "50%", "3": "95%"}
                 items.append({
                     "key":          key,
                     "url":          url,
