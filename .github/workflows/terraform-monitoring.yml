@@ -11,7 +11,6 @@ on:
         options:
           - plan
           - apply
-          - destroy
 
 jobs:
   monitoring:
@@ -37,7 +36,3 @@ jobs:
       - name: Terraform Apply
         if: github.event.inputs.action == 'apply'
         run: cd terraform-monitoring && terraform apply -auto-approve -var="endpoint=${{ secrets.ALERT_EMAIL }}"
-
-      - name: Terraform Destroy
-        if: github.event.inputs.action == 'destroy'
-        run: cd terraform-monitoring && terraform destroy -auto-approve -var="endpoint=${{ secrets.ALERT_EMAIL }}"
