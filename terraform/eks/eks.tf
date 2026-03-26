@@ -25,17 +25,6 @@ module "eks" {
   vpc_id     = var.vpc_id
   subnet_ids = var.private_subnets
 
-  node_security_group_additional_rules = {
-    ingress_cluster_primary_all = {
-      description              = "Cluster primary SG to node — allows Fargate pods to reach EC2 node (CoreDNS, etc.)"
-      protocol                 = "-1"
-      from_port                = 0
-      to_port                  = 0
-      type                     = "ingress"
-      source_security_group_id = module.eks.cluster_primary_security_group_id
-    }
-  }
-
   eks_managed_node_groups = {
     main = {
       instance_types = ["t3.medium"]
@@ -50,6 +39,16 @@ module "eks" {
     Environment = "dev"
     Terraform   = "true"
   }
+}
+
+resource "aws_security_group_rule" "node_ingress_from_cluster_primary" {
+  description              = "Cluster primary SG to node — allows Fargate pods to reach EC2 node (CoreDNS, etc.)"
+  type                     = "ingress"
+  from_port                = 0
+  to_port                  = 0
+  protocol                 = "-1"
+  security_group_id        = module.eks.node_security_group_id
+  source_security_group_id = module.eks.cluster_primary_security_group_id
 }
 
 module "fargate_profile_worker" {
