@@ -132,6 +132,39 @@ module "api_iam_role" {
   }
 }
 
+# KEDA operator
+
+module "keda_iam_role" {
+  source    = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version   = ">= 5.0, < 5.48"
+  role_name = "thumbnail-keda-operator"
+
+  oidc_providers = {
+    main = {
+      provider_arn               = var.oidc_provider_arn
+      namespace_service_accounts = ["kube-system:keda-operator"]
+    }
+  }
+
+  role_policy_arns = {
+    sqs = aws_iam_policy.keda_sqs_policy.arn
+  }
+}
+
+resource "aws_iam_policy" "keda_sqs_policy" {
+  name        = "thumbnail-keda-sqs-policy"
+  description = "Allows KEDA operator to read SQS queue depth for autoscaling"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["sqs:GetQueueAttributes", "sqs:GetQueueUrl"]
+      Resource = "arn:aws:sqs:ap-southeast-2:${var.account_id}:thumbnail-*"
+    }]
+  })
+}
+
 # AWS Load Balancer Controller
 
 module "alb_controller_iam_policy" {

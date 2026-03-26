@@ -31,8 +31,9 @@ spec:
             periodSeconds: 15
   triggers:
   - type: aws-sqs-queue
+    authenticationRef:
+      name: keda-trigger-auth-aws
     metadata:
       queueURL: https://sqs.ap-southeast-2.amazonaws.com/359707702022/thumbnail-pipeline-queue
       awsRegion: ap-southeast-2
-      targetValue: "3"                                    # Mandatory. The target value to which the metric will be compared against.
-      identityOwner: pod
+      targetValue: "3"

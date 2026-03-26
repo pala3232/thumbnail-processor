@@ -55,6 +55,13 @@ jobs:
           chmod +x deploy-keda.sh
           ./deploy-keda.sh
 
+      - name: Annotate KEDA service account with IAM role
+        run: |
+          KEDA_ROLE_ARN=$(cd terraform && terraform output -raw keda_role_arn)
+          kubectl annotate serviceaccount keda-operator -n kube-system \
+            eks.amazonaws.com/role-arn=$KEDA_ROLE_ARN \
+            --overwrite
+
       - name: Install ALB Controller
         run: |
           cd scripts
