@@ -20,7 +20,7 @@ spec:
         image: 359707702022.dkr.ecr.ap-southeast-2.amazonaws.com/thumbnail-worker:1.2.0
         resources:
           requests:
-            cpu: "500m"
+            cpu: "1000m"
             memory: "512Mi"
           limits:
             cpu: "2000m"
@@ -28,9 +28,15 @@ spec:
         livenessProbe:
           exec:
             command:
-            - pgrep
-            - "-f"
-            - main.py
+            - python3
+            - "-c"
+            - |
+              import os, sys
+              found = any(
+                b'main.py' in open(f'/proc/{p}/cmdline', 'rb').read()
+                for p in os.listdir('/proc') if p.isdigit()
+              )
+              sys.exit(0 if found else 1)
           initialDelaySeconds: 10
           periodSeconds: 15
         envFrom:
