@@ -4,7 +4,7 @@ Event-driven video thumbnail generator running on EKS (hybrid EC2 + Fargate).
 
 ## Architecture
 
-<img src="images/architecture.svg" width="100%">
+<a href="images/architecture.svg"><img src="images/architecture.svg" width="100%"></a>
 
 **Supported video formats:** `.mp4`, `.mov`, `.mkv`, `.avi`, `.webm`, `.wmv`, `.flv`, `.m4v`, `.ts`, `.3gp`
 
