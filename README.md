@@ -4,18 +4,13 @@ Event-driven video thumbnail generator running on EKS (hybrid EC2 + Fargate).
 
 ## Architecture
 
-```
-Browser ──HTTPS──────→ Route53 (thumbnail.yourdomain.com) → ALB ──/ws──→ FastAPI api service
-        ──WebSocket──→                                         ──/──→ Next.js frontend
-                                                                              ↓ (internal)
-                                                              FastAPI api service → SQS (queue depth + in-memory history)
-                                                                                  → S3  (thumbnails + presigned URLs)
-                                                                                  → K8s API (pod status)
-
-S3 (uploads/) ──event notification──→ SQS ──→ Worker (Fargate) → S3 (thumbnails/)
-```
+![Architecture Diagram](images/architecture.svg)
 
 **Supported video formats:** `.mp4`, `.mov`, `.mkv`, `.avi`, `.webm`, `.wmv`, `.flv`, `.m4v`, `.ts`, `.3gp`
+
+## Dashboard
+
+![Dashboard](images/3.png)
 
 ## Repository Structure
 

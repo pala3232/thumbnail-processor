@@ -26,19 +26,11 @@ data "aws_lb" "thumbnail" {
 
 resource "aws_route53_zone" "main" {
   name = var.domain_name
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "aws_acm_certificate" "cert" {
   domain_name       = "${var.subdomain}.${var.domain_name}"
   validation_method = "DNS"
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "aws_route53_record" "cert_validation" {
@@ -55,10 +47,6 @@ resource "aws_route53_record" "cert_validation" {
   type    = each.value.type
   ttl     = 60
   records = [each.value.record]
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "aws_acm_certificate_validation" "cert" {
