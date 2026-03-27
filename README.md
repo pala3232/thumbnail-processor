@@ -62,7 +62,7 @@ Next.js dashboard. Connects to the API via WebSocket for real-time updates (reco
 
 - **Live badge** — green `LIVE` / red `DOWN` based on WebSocket connection state
 - **Overview** — processed thumbnails, running pods, queue depth, in-flight, total pods, storage used
-- **Fargate Pods** — live pod grid with status, ready state, restart count, uptime
+- **Worker Pods** — live pod grid with status, ready state, restart count, uptime
 - **Queue Activity** — SQS depth chart (5-min in-memory history at 5s resolution)
 - **Thumbnail Gallery** — filterable by frame position (10%, 50%, 95%)
 - **Test Pipeline button** — copies videos from the test source bucket into `uploads/` to trigger the pipeline
